@@ -4,14 +4,14 @@
 
 ## 仓库与数据约定
 
-GitHub 仓库只保存代码、SQL、文档、配置文件和小型结果文件。
+GitHub 仓库只保存脚本、SQL、文档、配置文件和小型统计结果。
 
-原始 CSV 文件约 469MB，超过 GitHub 普通文件上传限制，因此不上传。SQLite 数据库文件由成员在本地导入生成，也不上传。
+原始 CSV 文件约 469MB，超过 GitHub 普通文件上传限制，因此不上传。Parquet 和 SQLite 数据库均由成员在本地生成，也不上传。
 
-组员 clone 仓库后，需要自行获取原始 CSV，并放入：
+组员 clone 仓库后，需要自行获取原始 CSV，并放到固定路径：
 
 ```text
-data/raw/
+data/raw/user_behavior_processed.csv
 ```
 
 推荐的本地数据库文件路径为：
@@ -44,7 +44,7 @@ database/taobao_user_behavior.db
 ## 本地使用流程
 
 1. Clone 本仓库。
-2. 获取原始 CSV，并放到 `data/raw/`。
+2. 获取原始 CSV，并放到 `data/raw/user_behavior_processed.csv`。
 3. 安装依赖：
 
    ```bash
@@ -57,18 +57,26 @@ database/taobao_user_behavior.db
    python scripts/setup_local_database.py
    ```
 
-   脚本会分块导入 CSV 到 `user_behavior_processed`，随后自动执行：
+   脚本以分块方式读取大 CSV，并生成：
+
+   ```text
+   data/raw/user_behavior_processed.parquet
+   database/taobao_user_behavior.db
+   ```
+
+   SQLite 原始表名固定为 `user_behavior_processed`。完成数据处理后，脚本还会自动执行：
 
    1. `sql/preprocessing/00_create_base_indexes.sql`
    2. `sql/preprocessing/01_create_behavior_mapping_view.sql`
 
-   默认 CSV 路径为 `data/raw/user_behavior_processed.csv`，数据库路径为 `database/taobao_user_behavior.db`。可通过 `--csv`、`--database` 和 `--chunksize` 修改。
-
-5. 为避免误覆盖，目标表已存在时脚本默认停止。如确认需要重建，可运行：
+5. Parquet 或 SQLite 原始表已存在时，脚本默认复用，不会覆盖。确认需要全部重建时可运行：
 
    ```bash
-   python scripts/setup_local_database.py --if-exists replace
+   python scripts/setup_local_database.py --parquet-if-exists replace --if-exists replace
    ```
 
 6. 导入完成后，可使用 `sql/preprocessing/02_basic_data_status_check.sql` 检查实际数据状态。
-7. 后续 EDA、特征工程和看板分析优先使用视图 `vw_user_behavior_mapped`，不直接修改输入表。
+7. 后续 Python 大表检查、清洗、EDA 和建模优先读取 Parquet；SQLite 数据库主要用于 DBeaver、SQL 验证和映射视图查询。
+8. 后续 SQL 分析优先使用视图 `vw_user_behavior_mapped`，不直接修改输入表。
+
+CSV、Parquet 和 SQLite 数据库都只保留在本地，不提交到 GitHub。
