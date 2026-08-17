@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Raw and large data
+data/raw/*.csv
+data/raw/*.zip
+data/interim/*.csv
+data/processed/*.csv
+data/features/*.csv
+data/splits/*.csv
+data/predictions/*.csv
+
+# Local databases
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+
+# Model and artifact outputs
+models/
+artifacts/
+outputs/
+
+# Keep source directory placeholders
+!src/models/
+!src/models/.gitkeep
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Keep directory placeholders
+!.gitkeep
