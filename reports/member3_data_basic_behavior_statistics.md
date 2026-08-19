@@ -7,6 +7,7 @@
 ## 1. 数据说明
 - 输入：`user_behavior_clean`
 - 输出：`behavior_distribution.csv`, `behavior_statistics.csv`, `item_statistics.csv`, `top_10_item.csv`, `category_statistics.csv`, `top_10_category.csv`, `daily_behavior.csv`, `hourly_behavior.csv`, `behavior_hourly_distribution.csv`, `descriptive_funnel.csv`
+- sql: `basic_behavior_statistics`
 
 ## 2. 统计四类行为分布：
 ### 2.1 任务：
