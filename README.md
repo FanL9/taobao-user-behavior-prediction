@@ -36,6 +36,18 @@ python scripts/run_user_behavior_cleaning.py --output-parquet
 python scripts/build_stage2_intermediate_tables.py
 ```
 
+### 可视化看板
+
+在项目根目录运行：
+
+```bash
+python -m pip install -r requirements.txt
+streamlit run dashboards/app.py
+```
+
+启动后打开终端提示的本地地址即可查看看板，默认地址为 `http://localhost:8501`。
+
+
 ## 阶段二已生成中间表
 
 | 文件 | 粒度 | 主键 |
