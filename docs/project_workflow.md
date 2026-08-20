@@ -9,6 +9,7 @@
 | 2026-08-20 | Member 1 | v1.0 | 完成阶段一项目流程整理 |
 | 2026-08-20 | Member 1 | v1.1 | 新增阶段二特征口径、中间表结构和特征字典代码 |
 | 2026-08-20 | Member 1 | v1.2 | 完成阶段一产物检查并生成阶段二特征字典与表结构 |
+| 2026-08-20 | Member 1 | v1.3 | 完成阶段二用户、商品、类目和时间中间表构建 |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -71,7 +72,10 @@
 - 验证主键定义、输入字段和规格文件导出逻辑 → `tests/test_stage2_feature_specification.py`
 - 生成用户、商品、类目和时间特征字典 → `data/features/stage2_feature_dictionary.csv`
 - 生成四类中间表的主键、粒度和字段结构 → `data/features/stage2_intermediate_table_schemas.json`
-- 后续生成用户维度中间表 → `data/features/user_features.parquet` （尚未实现）
-- 后续生成商品维度中间表 → `data/features/item_features.parquet` （尚未实现）
-- 后续生成类目维度中间表 → `data/features/category_features.parquet` （尚未实现）
-- 后续生成时间维度中间表 → `data/features/time_features.parquet` （尚未实现）
+- 从 clean Parquet 构建四类中间表并执行主键、类型和总量对账 → `src/features/stage2_intermediate_tables.py`
+- 提供四类中间表的全量构建入口 → `scripts/build_stage2_intermediate_tables.py`
+- 验证小样聚合、特征比率和输出对账 → `tests/test_stage2_intermediate_tables.py`
+- 生成 10,000 行用户维度中间表 → `data/features/user_features.parquet`
+- 生成 2,876,947 行商品维度中间表 → `data/features/item_features.parquet`
+- 生成 8,916 行类目维度中间表 → `data/features/category_features.parquet`
+- 生成 744 行日期-小时维度中间表 → `data/features/time_features.parquet`
