@@ -1,0 +1,61 @@
+# 项目流程
+
+> 记录格式：做了什么 → 对应文件或数据表路径。
+
+## 修改记录
+
+| 时间 | 修改人 | 版本号 | 备注 |
+| --- | --- | --- | --- |
+| 2026-08-20 | Member 1 | v1.0 | 完成阶段一项目流程整理 |
+
+## 阶段一：数据接入、基础治理与初步 EDA
+
+### 1. 项目与数据口径
+
+- 定义项目目标、预测对象和阶段划分 → `docs/project_definition.md`
+- 说明原始数据、Parquet 和 SQLite 的本地准备方式 → `docs/data_setup.md`
+- 记录输入数据的基础状态和字段口径 → `docs/basic_data_check.md`
+- 说明仓库结构、行为映射和本地运行流程 → `README.md`
+
+### 2. 数据接入与数据库
+
+- 提供项目运行所需的 Python 依赖清单 → `requirements.txt`
+- 保存阶段一的原始输入数据 → `data/raw/user_behavior_processed.csv`
+- 分块导入 CSV，并生成 Parquet、SQLite 原始表、索引和映射视图 → `scripts/setup_local_database.py`
+- 生成便于 Python 读取的原始 Parquet 表 → `data/raw/user_behavior_processed.parquet`
+- 生成本地 SQLite 数据库 → `database/taobao_user_behavior.db`
+- 在 SQLite 中保存导入后的原始行为表 → `database/taobao_user_behavior.db` 中的 `user_behavior_processed`
+- 为用户、商品、类目、行为和时间字段建立基础索引 → `sql/preprocessing/00_create_base_indexes.sql`
+- 将 1/2/3/4 行为类型映射为 pv/fav/cart/buy → `sql/preprocessing/01_create_behavior_mapping_view.sql`
+- 在 SQLite 中提供统一的行为映射视图 → `database/taobao_user_behavior.db` 中的 `vw_user_behavior_mapped`
+- 检查数据量、字段、时间范围和行为类型 → `sql/preprocessing/02_basic_data_status_check.sql`
+
+### 3. 数据质量检查与清洗
+
+- 实现分块读取、质量检查、异常处理、去重和字段标准化 → `src/data/user_behavior_cleaning_pipeline.py`
+- 提供清洗流程的命令行入口并组织输出 → `scripts/run_user_behavior_cleaning.py`
+- 验证清洗规则、去重、字段类型和输出一致性 → `tests/test_clean_user_behavior.py`
+- 为清洗自动化测试提供小型输入样本 → `tests/fixtures/user_behavior_sample.csv`
+- 生成标准清洗 CSV 表 → `data/processed/user_behavior_clean.csv`
+- 生成标准清洗 Parquet 表 → `data/processed/user_behavior_clean.parquet`
+- 输出数据规模、缺失值、非法值、字段值重复和清洗前后对比指标 → `outputs/user_behavior_cleaning_report.json`
+- 汇总数据质量问题、处理规则和清洗结果 → `reports/member2_data_quality_report.md`
+
+### 4. 基础行为统计与 EDA
+
+- 统计行为、用户、商品、类目、时间和转化漏斗 → `sql/basic_analysis/basic_behavior_statistics.sql`
+- 输出四类行为的数量与占比表 → `data/interim/behavior_distribution.csv`
+- 输出总行为、购买、购买用户、未购买用户和复购用户统计表 → `data/interim/behavior_statistics.csv`
+- 输出每个商品的浏览、收藏、加购和购买次数表 → `data/interim/item_statistics.csv` （尚未落盘）
+- 输出购买次数前 10 的热门商品表 → `data/interim/top_10_item.csv` （尚未落盘）
+- 输出类目行为量、购买量和购买占比表 → `data/interim/category_statistics.csv`
+- 输出购买次数前 10 的热门类目表 → `data/interim/top_10_category.csv` （尚未落盘）
+- 输出按日期汇总的行为量表 → `data/interim/daily_behavior.csv`
+- 输出按小时汇总的行为量表 → `data/interim/hourly_behavior.csv`
+- 输出各小时四类行为的分布表 → `data/interim/behavior_hourly_distribution.csv`
+- 输出浏览、收藏、加购和购买的描述性漏斗表 → `data/interim/descriptive_funnel.csv`
+- 汇总基础行为统计结果和业务结论 → `reports/member3_data_basic_behavior_statistics.md`
+
+### 5. 完整执行顺序
+
+`data/raw/user_behavior_processed.csv` → `scripts/setup_local_database.py` → `scripts/run_user_behavior_cleaning.py` → `sql/basic_analysis/basic_behavior_statistics.sql` → `reports/`
