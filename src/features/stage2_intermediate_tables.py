@@ -14,17 +14,25 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from src.features.stage2_feature_specification import (
-    BEHAVIOR_MAPPING,
-    DEFAULT_PARQUET_INPUT,
-    FEATURE_DEFINITIONS,
-    FEATURE_WINDOW,
-    TABLE_DEFINITIONS,
-    validate_clean_input_schema,
-)
-
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_PARQUET_INPUT = (
+    PROJECT_ROOT / "data" / "processed" / "user_behavior_clean.parquet"
+)
+OBSERVATION_START = datetime(2025, 11, 18, 0, 0, 0)
+OBSERVATION_END = datetime(2025, 12, 18, 23, 0, 0)
+RECENCY_REFERENCE_TIME = datetime(2025, 12, 19, 0, 0, 0)
+BEHAVIOR_MAPPING = {1: "pv", 2: "fav", 3: "cart", 4: "buy"}
+REQUIRED_INPUT_COLUMNS = (
+    "time",
+    "user_id",
+    "item_id",
+    "category_id",
+    "behavior_type",
+    "behavior_name",
+    "behavior_date",
+    "behavior_hour",
+    "weekday",
+)
 INPUT_COLUMNS = (
     "time",
     "user_id",
@@ -36,13 +44,85 @@ INPUT_COLUMNS = (
     "weekday",
 )
 HOURS_IN_NANOSECOND = 3_600_000_000_000.0
-SPEC_ARROW_TYPES = {
-    "int64": pa.int64(),
-    "int32": pa.int32(),
-    "uint8": pa.uint8(),
-    "float64": pa.float64(),
-    "datetime64[ns]": pa.timestamp("ns"),
-    "date32": pa.date32(),
+OUTPUT_SCHEMAS = {
+    "user_features": pa.schema(
+        [
+            ("user_id", pa.int64()),
+            ("user_total_count", pa.int64()),
+            ("user_pv_count", pa.int64()),
+            ("user_fav_count", pa.int64()),
+            ("user_cart_count", pa.int64()),
+            ("user_buy_count", pa.int64()),
+            ("user_unique_item_count", pa.int64()),
+            ("user_unique_category_count", pa.int64()),
+            ("user_active_day_count", pa.int32()),
+            ("user_first_behavior_time", pa.timestamp("ns")),
+            ("user_last_behavior_time", pa.timestamp("ns")),
+            ("user_recency_hours", pa.float64()),
+            ("user_fav_to_pv_rate", pa.float64()),
+            ("user_cart_to_pv_rate", pa.float64()),
+            ("user_buy_to_pv_rate", pa.float64()),
+            ("user_is_buyer", pa.uint8()),
+            ("user_is_repeat_buyer", pa.uint8()),
+        ]
+    ),
+    "item_features": pa.schema(
+        [
+            ("item_id", pa.int64()),
+            ("category_id", pa.int64()),
+            ("item_total_count", pa.int64()),
+            ("item_pv_count", pa.int64()),
+            ("item_fav_count", pa.int64()),
+            ("item_cart_count", pa.int64()),
+            ("item_buy_count", pa.int64()),
+            ("item_unique_user_count", pa.int64()),
+            ("item_unique_buyer_count", pa.int64()),
+            ("item_active_day_count", pa.int32()),
+            ("item_fav_to_pv_rate", pa.float64()),
+            ("item_cart_to_pv_rate", pa.float64()),
+            ("item_buy_to_pv_rate", pa.float64()),
+        ]
+    ),
+    "category_features": pa.schema(
+        [
+            ("category_id", pa.int64()),
+            ("category_total_count", pa.int64()),
+            ("category_pv_count", pa.int64()),
+            ("category_fav_count", pa.int64()),
+            ("category_cart_count", pa.int64()),
+            ("category_buy_count", pa.int64()),
+            ("category_unique_user_count", pa.int64()),
+            ("category_unique_item_count", pa.int64()),
+            ("category_unique_buyer_count", pa.int64()),
+            ("category_fav_to_pv_rate", pa.float64()),
+            ("category_cart_to_pv_rate", pa.float64()),
+            ("category_buy_to_pv_rate", pa.float64()),
+        ]
+    ),
+    "time_features": pa.schema(
+        [
+            ("behavior_date", pa.date32()),
+            ("behavior_hour", pa.uint8()),
+            ("weekday", pa.uint8()),
+            ("time_total_count", pa.int64()),
+            ("time_pv_count", pa.int64()),
+            ("time_fav_count", pa.int64()),
+            ("time_cart_count", pa.int64()),
+            ("time_buy_count", pa.int64()),
+            ("time_unique_user_count", pa.int64()),
+            ("time_unique_item_count", pa.int64()),
+            ("time_buy_to_pv_rate", pa.float64()),
+        ]
+    ),
+}
+TABLE_PRIMARY_KEYS = {
+    "user_features": ("user_id",),
+    "item_features": ("item_id",),
+    "category_features": ("category_id",),
+    "time_features": ("behavior_date", "behavior_hour"),
+}
+OUTPUT_FILENAMES = {
+    name: f"{name}.parquet" for name in OUTPUT_SCHEMAS
 }
 
 
@@ -55,16 +135,8 @@ class IntermediateTableBuildResult:
     elapsed_seconds: float
 
 
-def _table_definition(name: str):
-    return next(table for table in TABLE_DEFINITIONS if table.table_name == name)
-
-
 def _output_columns(name: str) -> list[str]:
-    return [
-        feature.feature_name
-        for feature in FEATURE_DEFINITIONS
-        if feature.table_name == name
-    ]
+    return OUTPUT_SCHEMAS[name].names
 
 
 def _append_behavior_flags(table: pa.Table) -> pa.Table:
@@ -113,7 +185,7 @@ def _date32(values: pa.ChunkedArray) -> pa.Array | pa.ChunkedArray:
 def _recency_hours(last_times: pa.ChunkedArray) -> pa.Array:
     epoch = datetime(1970, 1, 1)
     reference_ns = int(
-        (FEATURE_WINDOW.recency_reference_time - epoch).total_seconds()
+        (RECENCY_REFERENCE_TIME - epoch).total_seconds()
         * 1_000_000_000
     )
     delta_ns = pc.subtract(
@@ -349,13 +421,16 @@ def build_time_features(clean: pa.Table) -> pa.Table:
 
 
 def _load_clean_table(input_path: Path) -> pa.Table:
-    validate_clean_input_schema(input_path)
+    input_columns = pq.read_schema(input_path).names
+    missing = [column for column in REQUIRED_INPUT_COLUMNS if column not in input_columns]
+    if missing:
+        raise ValueError(f"Clean Parquet is missing required columns: {missing}")
     table = pq.read_table(
         input_path,
         columns=list(INPUT_COLUMNS),
         filters=[
-            ("time", ">=", FEATURE_WINDOW.observation_start),
-            ("time", "<=", FEATURE_WINDOW.observation_end),
+            ("time", ">=", OBSERVATION_START),
+            ("time", "<=", OBSERVATION_END),
         ],
         use_threads=True,
     )
@@ -380,28 +455,26 @@ def _temporary_output_path(target: Path) -> Path:
 
 
 def _validate_output(name: str, table: pa.Table, input_rows: int) -> None:
-    definition = _table_definition(name)
     expected_columns = _output_columns(name)
     if table.column_names != expected_columns:
         raise RuntimeError(
             f"{name} columns differ from the feature specification: "
             f"{table.column_names}"
         )
-    for feature in FEATURE_DEFINITIONS:
-        if feature.table_name != name:
-            continue
-        expected_type = SPEC_ARROW_TYPES[feature.data_type]
-        actual_type = table.schema.field(feature.feature_name).type
+    for field in OUTPUT_SCHEMAS[name]:
+        expected_type = field.type
+        actual_type = table.schema.field(field.name).type
         if actual_type != expected_type:
             raise RuntimeError(
-                f"{name}.{feature.feature_name} has type {actual_type}; "
+                f"{name}.{field.name} has type {actual_type}; "
                 f"expected {expected_type}"
             )
     if table.num_rows == 0:
         raise RuntimeError(f"{name} is empty")
-    if any(table[key].null_count for key in definition.primary_key):
+    primary_key = TABLE_PRIMARY_KEYS[name]
+    if any(table[key].null_count for key in primary_key):
         raise RuntimeError(f"{name} contains a null primary key")
-    key_groups = table.group_by(list(definition.primary_key)).aggregate(
+    key_groups = table.group_by(list(primary_key)).aggregate(
         [([], "count_all")]
     )
     if key_groups.num_rows != table.num_rows:
@@ -446,7 +519,7 @@ def build_stage2_intermediate_tables(
         for name, builder in builders.items():
             table = builder(clean)
             _validate_output(name, table, input_rows)
-            target = output_directory / Path(_table_definition(name).output_path).name
+            target = output_directory / OUTPUT_FILENAMES[name]
             temporary = _temporary_output_path(target)
             temporary_paths.append(temporary)
             pq.write_table(

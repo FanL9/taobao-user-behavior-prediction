@@ -12,8 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.features.stage2_feature_specification import DEFAULT_PARQUET_INPUT  # noqa: E402
 from src.features.stage2_intermediate_tables import (  # noqa: E402
+    DEFAULT_PARQUET_INPUT,
     build_stage2_intermediate_tables,
 )
 
@@ -61,4 +61,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

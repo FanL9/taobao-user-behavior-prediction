@@ -33,7 +33,6 @@ data/processed/user_behavior_clean.parquet
 python -m pip install -r requirements.txt
 python scripts/setup_local_database.py
 python scripts/run_user_behavior_cleaning.py --output-parquet
-python scripts/export_stage2_feature_specification.py
 python scripts/build_stage2_intermediate_tables.py
 ```
 

@@ -7,10 +7,11 @@
 | 时间 | 修改人 | 版本号 | 备注 |
 | --- | --- | --- | --- |
 | 2026-08-20 | Member 1 | v1.0 | 完成阶段一项目流程整理 |
-| 2026-08-20 | Member 1 | v1.1 | 新增阶段二特征口径、中间表结构和特征字典代码 |
-| 2026-08-20 | Member 1 | v1.2 | 完成阶段一产物检查并生成阶段二特征字典与表结构 |
+| 2026-08-20 | Member 1 | v1.1 | 新增阶段二特征口径和中间表设计 |
+| 2026-08-20 | Member 1 | v1.2 | 完成阶段一产物检查 |
 | 2026-08-20 | Member 1 | v1.3 | 完成阶段二用户、商品、类目和时间中间表构建 |
 | 2026-08-20 | Member 1 | v1.4 | 同步统一口径、项目流程和精简 README |
+| 2026-08-20 | Member 1 | v1.5 | 删除独立规格代码和字典输出，特征口径统一收口到 `project_definition.md` |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -69,11 +70,7 @@
 ### 1. 特征口径与中间表设计
 
 - 阶段二四张基础中间表均直接基于 `data/processed/user_behavior_clean.parquet` 构建
-- 统一统计窗口、粒度、时间和转化率口径，并定义用户、商品、类目和时间中间表字段 → `src/features/stage2_feature_specification.py`
-- 校验 clean 输入字段并导出特征字典和中间表结构 → `scripts/export_stage2_feature_specification.py`
-- 验证主键定义、输入字段和规格文件导出逻辑 → `tests/test_stage2_feature_specification.py`
-- 生成用户、商品、类目和时间特征字典 → `data/features/stage2_feature_dictionary.csv`
-- 生成四类中间表的主键、粒度和字段结构 → `data/features/stage2_intermediate_table_schemas.json`
+- 统计窗口、粒度、字段、主键和转化率统一口径 → `docs/project_definition.md`
 - 从 clean Parquet 构建四类中间表并执行主键、类型和总量对账 → `src/features/stage2_intermediate_tables.py`
 - 提供四类中间表的全量构建入口 → `scripts/build_stage2_intermediate_tables.py`
 - 验证小样聚合、特征比率和输出对账 → `tests/test_stage2_intermediate_tables.py`
@@ -84,4 +81,4 @@
 
 ### 2. 当前执行顺序
 
-`data/processed/user_behavior_clean.parquet` → `scripts/export_stage2_feature_specification.py` → `scripts/build_stage2_intermediate_tables.py` → `data/features/`
+`data/processed/user_behavior_clean.parquet` → `scripts/build_stage2_intermediate_tables.py` → `data/features/`

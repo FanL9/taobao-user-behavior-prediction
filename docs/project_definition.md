@@ -11,11 +11,12 @@
 | 2026-08-17 | Member 1 | v1.0 | 初始化项目全流程统一口径文件 |
 | 2026-08-20 | Member 1 | v1.1 | 补全阶段一和阶段二已确定的数据、清洗、统计、特征和中间表口径 |
 | 2026-08-20 | Member 1 | v1.2 | 记录阶段二四张已生成中间表，并允许 `data/features/` 上传 Git |
+| 2026-08-20 | Member 1 | v1.3 | 取消独立特征规格代码和字典文件，特征口径统一收口到本文件 |
 
 ## 1. 文档权威性与冲突处理
 
 1. `docs/project_definition.md` 是项目口径的唯一权威来源。
-2. 代码、SQL、特征字典、看板和报告必须与本文件一致。
+2. 代码、SQL、中间表、看板和报告必须与本文件一致。
 3. 如实现与本文件冲突，先停止使用冲突结果，由 Member 1 确认后同步修改代码和本文件。
 4. 报告中的数值必须来自当前口径下重新生成的结果，不得复用已废弃口径的历史数值。
 5. 历史“删除全部四元组重复”口径已废弃；由此产生的 6,213,379 行 clean 数据、旧版 EDA 数值和 `outputs/user_behavior_cleaning_report.json` 不得作为当前正式结论。
@@ -204,10 +205,7 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 主键 | ID 字段使用 `int64`，主键不允许缺失或重复 |
 | 连接后缺失 | 计数和比率填 `0`，布尔/0-1 标记填 `0`，分层字段填 `unknown` |
 | 大表格式 | Parquet；`data/features/` 中的特征表允许上传 Git |
-| 字典必需项 | 表名、字段名、数据类型、字段含义、计算逻辑、数据来源、粒度、是否用于建模、是否可空 |
-| 规格代码 | `src/features/stage2_feature_specification.py` |
-| 字典输出 | `data/features/stage2_feature_dictionary.csv` |
-| 表结构输出 | `data/features/stage2_intermediate_table_schemas.json` |
+| 口径与字段来源 | 本文件是唯一口径来源，不再另行维护特征字典代码或规格文件 |
 | 四表构建实现 | `src/features/stage2_intermediate_tables.py` |
 | 四表运行入口 | `scripts/build_stage2_intermediate_tables.py` |
 
@@ -240,7 +238,16 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 
 ## 12. 阶段二具体特征口径
 
-> 当前已生成的四张表是基础版，字段以 `data/features/stage2_feature_dictionary.csv` v1 为准。本节同时规定阶段二最终特征范围；日均行为、活跃分层、时段、热度分层和序列等尚未进入 v1 字典的特征，由对应成员后续补充并升级字典版本。
+> 当前已生成的四张表是基础版，字段以下表为准。日均行为、活跃分层、时段、热度分层和序列等特征由对应成员后续补充，补充时必须先更新本文件。
+
+### 12.0 当前基础表字段
+
+| 表 | 当前字段 |
+| --- | --- |
+| `user_features` | `user_id`, `user_total_count`, `user_pv_count`, `user_fav_count`, `user_cart_count`, `user_buy_count`, `user_unique_item_count`, `user_unique_category_count`, `user_active_day_count`, `user_first_behavior_time`, `user_last_behavior_time`, `user_recency_hours`, `user_fav_to_pv_rate`, `user_cart_to_pv_rate`, `user_buy_to_pv_rate`, `user_is_buyer`, `user_is_repeat_buyer` |
+| `item_features` | `item_id`, `category_id`, `item_total_count`, `item_pv_count`, `item_fav_count`, `item_cart_count`, `item_buy_count`, `item_unique_user_count`, `item_unique_buyer_count`, `item_active_day_count`, `item_fav_to_pv_rate`, `item_cart_to_pv_rate`, `item_buy_to_pv_rate` |
+| `category_features` | `category_id`, `category_total_count`, `category_pv_count`, `category_fav_count`, `category_cart_count`, `category_buy_count`, `category_unique_user_count`, `category_unique_item_count`, `category_unique_buyer_count`, `category_fav_to_pv_rate`, `category_cart_to_pv_rate`, `category_buy_to_pv_rate` |
+| `time_features` | `behavior_date`, `behavior_hour`, `weekday`, `time_total_count`, `time_pv_count`, `time_fav_count`, `time_cart_count`, `time_buy_count`, `time_unique_user_count`, `time_unique_item_count`, `time_buy_to_pv_rate` |
 
 ### 12.1 用户特征
 
