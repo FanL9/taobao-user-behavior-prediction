@@ -10,6 +10,7 @@
 | 2026-08-20 | Member 1 | v1.1 | 新增阶段二特征口径、中间表结构和特征字典代码 |
 | 2026-08-20 | Member 1 | v1.2 | 完成阶段一产物检查并生成阶段二特征字典与表结构 |
 | 2026-08-20 | Member 1 | v1.3 | 完成阶段二用户、商品、类目和时间中间表构建 |
+| 2026-08-20 | Member 1 | v1.4 | 同步统一口径、项目流程和精简 README |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -67,6 +68,7 @@
 
 ### 1. 特征口径与中间表设计
 
+- 阶段二四张基础中间表均直接基于 `data/processed/user_behavior_clean.parquet` 构建
 - 统一统计窗口、粒度、时间和转化率口径，并定义用户、商品、类目和时间中间表字段 → `src/features/stage2_feature_specification.py`
 - 校验 clean 输入字段并导出特征字典和中间表结构 → `scripts/export_stage2_feature_specification.py`
 - 验证主键定义、输入字段和规格文件导出逻辑 → `tests/test_stage2_feature_specification.py`
@@ -79,3 +81,7 @@
 - 生成 2,876,947 行商品维度中间表 → `data/features/item_features.parquet`
 - 生成 8,916 行类目维度中间表 → `data/features/category_features.parquet`
 - 生成 744 行日期-小时维度中间表 → `data/features/time_features.parquet`
+
+### 2. 当前执行顺序
+
+`data/processed/user_behavior_clean.parquet` → `scripts/export_stage2_feature_specification.py` → `scripts/build_stage2_intermediate_tables.py` → `data/features/`

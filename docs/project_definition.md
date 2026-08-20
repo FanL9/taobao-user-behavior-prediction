@@ -10,6 +10,7 @@
 | --- | --- | --- | --- |
 | 2026-08-17 | Member 1 | v1.0 | 初始化项目全流程统一口径文件 |
 | 2026-08-20 | Member 1 | v1.1 | 补全阶段一和阶段二已确定的数据、清洗、统计、特征和中间表口径 |
+| 2026-08-20 | Member 1 | v1.2 | 记录阶段二四张已生成中间表，并允许 `data/features/` 上传 Git |
 
 ## 1. 文档权威性与冲突处理
 
@@ -45,7 +46,7 @@
 | Python 阶段二输入 | clean Parquet 优先，clean CSV 仅作小样或兼容备用 |
 | SQL 用途 | SQLite 用于 SQL 验证和 DBeaver 查看，不作为阶段二特征的权威输入 |
 | 原始文件保护 | 原始 CSV 不直接修改；所有派生结果写入 `data/processed/`、`data/interim/` 或 `data/features/` |
-| Git 管理 | 大型 CSV、Parquet、SQLite、模型和大型输出仅本地生成，不上传 Git；代码、SQL、文档和可提交的小型统计结果可上传 |
+| Git 管理 | `data/raw/`、`data/processed/` 和数据库大文件不上传；`data/features/` 中的 CSV、JSON 和 Parquet 允许上传；代码、SQL、文档和报告可上传 |
 | 本地初始化 | 统一运行 `python scripts/setup_local_database.py` |
 
 ## 4. 当前输入数据快照
@@ -202,24 +203,26 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 特征命名 | 使用 snake_case，按粒度使用 `user_`、`item_`、`category_`、`time_`、`sequence_`、`conversion_`、`ui_` 前缀 |
 | 主键 | ID 字段使用 `int64`，主键不允许缺失或重复 |
 | 连接后缺失 | 计数和比率填 `0`，布尔/0-1 标记填 `0`，分层字段填 `unknown` |
-| 大表格式 | Parquet，本地生成，不上传 Git |
+| 大表格式 | Parquet；`data/features/` 中的特征表允许上传 Git |
 | 字典必需项 | 表名、字段名、数据类型、字段含义、计算逻辑、数据来源、粒度、是否用于建模、是否可空 |
 | 规格代码 | `src/features/stage2_feature_specification.py` |
-| 字典预定输出 | `data/features/stage2_feature_dictionary.csv` |
-| 表结构预定输出 | `data/features/stage2_intermediate_table_schemas.json` |
+| 字典输出 | `data/features/stage2_feature_dictionary.csv` |
+| 表结构输出 | `data/features/stage2_intermediate_table_schemas.json` |
+| 四表构建实现 | `src/features/stage2_intermediate_tables.py` |
+| 四表运行入口 | `scripts/build_stage2_intermediate_tables.py` |
 
 ## 11. 阶段二中间表、粒度和键
 
-| 中间表 | 输出路径 | 粒度 | 主键/唯一键 |
-| --- | --- | --- | --- |
-| 用户特征表 | `data/features/user_features.parquet` | 每用户一行 | `user_id` |
-| 时间特征表 | `data/features/time_features.parquet` | 每日每小时一行 | `behavior_date + behavior_hour` |
-| 用户序列特征表 | `data/features/user_sequence_features.parquet` | 每用户一行 | `user_id` |
-| 商品特征表 | `data/features/item_features.parquet` | 每商品一行 | `item_id` |
-| 类目特征表 | `data/features/category_features.parquet` | 每类目一行 | `category_id` |
-| 商品转化链路表 | `data/features/item_conversion_features.parquet` | 每商品一行 | `item_id` |
-| 用户-商品交互表 | `data/features/user_item_features.parquet` | 每用户-商品一行 | `user_id + item_id` |
-| 用户-商品特征宽表 | `data/features/user_item_feature_table.parquet` | 每用户-商品一行 | `user_id + item_id` |
+| 中间表 | 输出路径 | 粒度 | 主键/唯一键 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| 用户特征表 | `data/features/user_features.parquet` | 每用户一行 | `user_id` | 已生成，10,000 行 |
+| 时间特征表 | `data/features/time_features.parquet` | 每日每小时一行 | `behavior_date + behavior_hour` | 已生成，744 行 |
+| 用户序列特征表 | `data/features/user_sequence_features.parquet` | 每用户一行 | `user_id` | 尚未生成 |
+| 商品特征表 | `data/features/item_features.parquet` | 每商品一行 | `item_id` | 已生成，2,876,947 行 |
+| 类目特征表 | `data/features/category_features.parquet` | 每类目一行 | `category_id` | 已生成，8,916 行 |
+| 商品转化链路表 | `data/features/item_conversion_features.parquet` | 每商品一行 | `item_id` | 尚未生成 |
+| 用户-商品交互表 | `data/features/user_item_features.parquet` | 每用户-商品一行 | `user_id + item_id` | 尚未生成 |
+| 用户-商品特征宽表 | `data/features/user_item_feature_table.parquet` | 每用户-商品一行 | `user_id + item_id` | 尚未生成 |
 
 ### 11.1 外键和连接规则
 
@@ -236,6 +239,8 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 商品表按 `item_id` 唯一。如同一商品对应多个 `category_id`，取该商品中出现次数最多的类目；如出现次数并列，取最小 `category_id`。
 
 ## 12. 阶段二具体特征口径
+
+> 当前已生成的四张表是基础版，字段以 `data/features/stage2_feature_dictionary.csv` v1 为准。本节同时规定阶段二最终特征范围；日均行为、活跃分层、时段、热度分层和序列等尚未进入 v1 字典的特征，由对应成员后续补充并升级字典版本。
 
 ### 12.1 用户特征
 
