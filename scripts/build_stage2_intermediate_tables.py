@@ -1,4 +1,4 @@
-"""Command-line entry point for the four stage-two intermediate tables."""
+"""Command-line entry point for the stage-two intermediate tables."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from src.features.stage2_intermediate_tables import (  # noqa: E402
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build user, item, category, and time feature Parquet tables."
+        description="Build user, item, category, time, and user-item feature tables."
     )
     parser.add_argument("--input", type=Path, default=DEFAULT_PARQUET_INPUT)
     parser.add_argument(

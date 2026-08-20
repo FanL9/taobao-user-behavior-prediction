@@ -22,6 +22,9 @@ data/splits/*.parquet
 data/predictions/*.csv
 data/predictions/*.parquet
 
+# Large user-item feature table (generate locally)
+data/features/user_item_features.parquet
+
 # Local databases
 database/*.db
 database/*.sqlite

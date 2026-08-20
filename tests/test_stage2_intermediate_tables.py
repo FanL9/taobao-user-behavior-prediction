@@ -14,7 +14,7 @@ from src.features.stage2_intermediate_tables import build_stage2_intermediate_ta
 
 
 class Stage2IntermediateTableTests(unittest.TestCase):
-    def test_builds_four_reconciled_tables(self) -> None:
+    def test_builds_reconciled_tables(self) -> None:
         clean = pa.table(
             {
                 "time": pa.array(
@@ -66,6 +66,7 @@ class Stage2IntermediateTableTests(unittest.TestCase):
                     "item_features": 2,
                     "category_features": 2,
                     "time_features": 5,
+                    "user_item_features": 3,
                 },
             )
             user = pq.read_table(result.output_paths["user_features"])
@@ -74,7 +75,22 @@ class Stage2IntermediateTableTests(unittest.TestCase):
             self.assertEqual(first_user["user_buy_count"], 1)
             self.assertEqual(first_user["user_buy_to_pv_rate"], 0.5)
 
+            user_item = pq.read_table(result.output_paths["user_item_features"])
+            interaction = user_item.filter(
+                pa.compute.and_(
+                    pa.compute.equal(user_item["user_id"], 1),
+                    pa.compute.equal(user_item["item_id"], 10),
+                )
+            ).to_pylist()[0]
+            self.assertEqual(interaction["ui_pv_count"], 1)
+            self.assertEqual(interaction["ui_cart_count"], 1)
+            self.assertEqual(interaction["ui_buy_count"], 1)
+            self.assertEqual(
+                interaction["ui_last_interaction_time"], datetime(2025, 11, 18, 3)
+            )
+            self.assertEqual(interaction["ui_last_interaction_hour"], 3)
+            self.assertEqual(interaction["ui_has_bought"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
-

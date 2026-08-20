@@ -7,7 +7,7 @@
 ```text
 data/raw/user_behavior_processed.csv
     → data/processed/user_behavior_clean.parquet
-    → data/features/{user,item,category,time}_features.parquet
+    → data/features/{user,item,category,time,user_item}_features.parquet
 ```
 
 阶段二的权威输入是：
@@ -44,11 +44,13 @@ python scripts/build_stage2_intermediate_tables.py
 | `data/features/item_features.parquet` | 每商品一行 | `item_id` |
 | `data/features/category_features.parquet` | 每类目一行 | `category_id` |
 | `data/features/time_features.parquet` | 每日每小时一行 | `behavior_date + behavior_hour` |
+| `data/features/user_item_features.parquet` | 每用户-商品一行 | `user_id + item_id` |
 
 ## Git 约定
 
 - `data/raw/`、`data/processed/` 和 `database/` 中的大文件不上传。
-- `data/features/` 中的特征文件可上传。
+- `data/features/` 中除 `user_item_features.parquet` 外的特征文件可上传。
+- 大文件的本地准备和生成方式见 `docs/local_large_files.md`。
 - 代码、SQL、文档和报告可上传。
 
 ## 文档

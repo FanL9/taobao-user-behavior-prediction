@@ -1,4 +1,4 @@
-"""Build the four stage-two intermediate feature tables from clean Parquet."""
+"""Build stage-two intermediate feature tables from clean Parquet."""
 
 from __future__ import annotations
 
@@ -114,12 +114,27 @@ OUTPUT_SCHEMAS = {
             ("time_buy_to_pv_rate", pa.float64()),
         ]
     ),
+    "user_item_features": pa.schema(
+        [
+            ("user_id", pa.int64()),
+            ("item_id", pa.int64()),
+            ("ui_pv_count", pa.int64()),
+            ("ui_fav_count", pa.int64()),
+            ("ui_cart_count", pa.int64()),
+            ("ui_buy_count", pa.int64()),
+            ("ui_last_interaction_time", pa.timestamp("ns")),
+            ("ui_last_interaction_date", pa.date32()),
+            ("ui_last_interaction_hour", pa.uint8()),
+            ("ui_has_bought", pa.uint8()),
+        ]
+    ),
 }
 TABLE_PRIMARY_KEYS = {
     "user_features": ("user_id",),
     "item_features": ("item_id",),
     "category_features": ("category_id",),
     "time_features": ("behavior_date", "behavior_hour"),
+    "user_item_features": ("user_id", "item_id"),
 }
 OUTPUT_FILENAMES = {
     name: f"{name}.parquet" for name in OUTPUT_SCHEMAS
@@ -420,6 +435,47 @@ def build_time_features(clean: pa.Table) -> pa.Table:
     )
 
 
+def build_user_item_features(clean: pa.Table) -> pa.Table:
+    """Aggregate behavior at the unique user-item interaction grain."""
+    grouped = clean.group_by(["user_id", "item_id"]).aggregate(
+        [
+            ("_pv_flag", "sum"),
+            ("_fav_flag", "sum"),
+            ("_cart_flag", "sum"),
+            ("_buy_flag", "sum"),
+            ("time", "max"),
+        ]
+    )
+    grouped = _rename(
+        grouped,
+        [
+            "user_id",
+            "item_id",
+            "ui_pv_count",
+            "ui_fav_count",
+            "ui_cart_count",
+            "ui_buy_count",
+            "ui_last_interaction_time",
+        ],
+    )
+    grouped = grouped.append_column(
+        "ui_last_interaction_date",
+        pc.cast(grouped["ui_last_interaction_time"], pa.date32()),
+    )
+    grouped = grouped.append_column(
+        "ui_last_interaction_hour",
+        pc.cast(pc.hour(grouped["ui_last_interaction_time"]), pa.uint8()),
+    )
+    grouped = grouped.append_column(
+        "ui_has_bought",
+        pc.cast(pc.greater_equal(grouped["ui_buy_count"], 1), pa.uint8()),
+    )
+    return _sort(
+        grouped.select(_output_columns("user_item_features")),
+        ["user_id", "item_id"],
+    )
+
+
 def _load_clean_table(input_path: Path) -> pa.Table:
     input_columns = pq.read_schema(input_path).names
     missing = [column for column in REQUIRED_INPUT_COLUMNS if column not in input_columns]
@@ -484,8 +540,15 @@ def _validate_output(name: str, table: pa.Table, input_rows: int) -> None:
         "item_features": "item_total_count",
         "category_features": "category_total_count",
         "time_features": "time_total_count",
-    }[name]
-    if pc.sum(table[total_column]).as_py() != input_rows:
+    }.get(name)
+    if total_column is not None:
+        output_total = pc.sum(table[total_column]).as_py()
+    else:
+        output_total = sum(
+            pc.sum(table[column]).as_py()
+            for column in ("ui_pv_count", "ui_fav_count", "ui_cart_count", "ui_buy_count")
+        )
+    if output_total != input_rows:
         raise RuntimeError(f"{name} total count does not reconcile to input rows")
 
 
@@ -494,7 +557,7 @@ def build_stage2_intermediate_tables(
     *,
     output_directory: Path | str = PROJECT_ROOT / "data" / "features",
 ) -> IntermediateTableBuildResult:
-    """Build, validate, and atomically write the four feature tables."""
+    """Build, validate, and atomically write the stage-two feature tables."""
 
     started_at = time.perf_counter()
     input_path = Path(input_path).resolve()
@@ -511,6 +574,7 @@ def build_stage2_intermediate_tables(
         "item_features": build_item_features,
         "category_features": build_category_features,
         "time_features": build_time_features,
+        "user_item_features": build_user_item_features,
     }
     output_paths: dict[str, Path] = {}
     output_rows: dict[str, int] = {}

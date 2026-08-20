@@ -12,6 +12,7 @@
 | 2026-08-20 | Member 1 | v1.3 | 完成阶段二用户、商品、类目和时间中间表构建 |
 | 2026-08-20 | Member 1 | v1.4 | 同步统一口径、项目流程和精简 README |
 | 2026-08-20 | Member 1 | v1.5 | 删除独立规格代码和字典输出，特征口径统一收口到 `project_definition.md` |
+| 2026-08-20 | Member 1 | v1.6 | 新增用户-商品交互特征表 |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -69,15 +70,16 @@
 
 ### 1. 特征口径与中间表设计
 
-- 阶段二四张基础中间表均直接基于 `data/processed/user_behavior_clean.parquet` 构建
+- 阶段二基础中间表均直接基于 `data/processed/user_behavior_clean.parquet` 构建
 - 统计窗口、粒度、字段、主键和转化率统一口径 → `docs/project_definition.md`
-- 从 clean Parquet 构建四类中间表并执行主键、类型和总量对账 → `src/features/stage2_intermediate_tables.py`
-- 提供四类中间表的全量构建入口 → `scripts/build_stage2_intermediate_tables.py`
+- 从 clean Parquet 构建基础中间表并执行主键、类型和总量对账 → `src/features/stage2_intermediate_tables.py`
+- 提供阶段二中间表的全量构建入口 → `scripts/build_stage2_intermediate_tables.py`
 - 验证小样聚合、特征比率和输出对账 → `tests/test_stage2_intermediate_tables.py`
 - 生成 10,000 行用户维度中间表 → `data/features/user_features.parquet`
 - 生成 2,876,947 行商品维度中间表 → `data/features/item_features.parquet`
 - 生成 8,916 行类目维度中间表 → `data/features/category_features.parquet`
 - 生成 744 行日期-小时维度中间表 → `data/features/time_features.parquet`
+- 按 `user_id + item_id` 生成 4,686,904 行四类交互数、最近交互时间和购买标记 → `data/features/user_item_features.parquet`
 
 ### 2. 当前执行顺序
 

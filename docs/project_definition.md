@@ -219,7 +219,7 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 商品特征表 | `data/features/item_features.parquet` | 每商品一行 | `item_id` | 已生成，2,876,947 行 |
 | 类目特征表 | `data/features/category_features.parquet` | 每类目一行 | `category_id` | 已生成，8,916 行 |
 | 商品转化链路表 | `data/features/item_conversion_features.parquet` | 每商品一行 | `item_id` | 尚未生成 |
-| 用户-商品交互表 | `data/features/user_item_features.parquet` | 每用户-商品一行 | `user_id + item_id` | 尚未生成 |
+| 用户-商品交互表 | `data/features/user_item_features.parquet` | 每用户-商品一行 | `user_id + item_id` | 已生成，4,686,904 行 |
 | 用户-商品特征宽表 | `data/features/user_item_feature_table.parquet` | 每用户-商品一行 | `user_id + item_id` | 尚未生成 |
 
 ### 11.1 外键和连接规则
@@ -248,6 +248,7 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | `item_features` | `item_id`, `category_id`, `item_total_count`, `item_pv_count`, `item_fav_count`, `item_cart_count`, `item_buy_count`, `item_unique_user_count`, `item_unique_buyer_count`, `item_active_day_count`, `item_fav_to_pv_rate`, `item_cart_to_pv_rate`, `item_buy_to_pv_rate` |
 | `category_features` | `category_id`, `category_total_count`, `category_pv_count`, `category_fav_count`, `category_cart_count`, `category_buy_count`, `category_unique_user_count`, `category_unique_item_count`, `category_unique_buyer_count`, `category_fav_to_pv_rate`, `category_cart_to_pv_rate`, `category_buy_to_pv_rate` |
 | `time_features` | `behavior_date`, `behavior_hour`, `weekday`, `time_total_count`, `time_pv_count`, `time_fav_count`, `time_cart_count`, `time_buy_count`, `time_unique_user_count`, `time_unique_item_count`, `time_buy_to_pv_rate` |
+| `user_item_features` | `user_id`, `item_id`, `ui_pv_count`, `ui_fav_count`, `ui_cart_count`, `ui_buy_count`, `ui_last_interaction_time`, `ui_last_interaction_date`, `ui_last_interaction_hour`, `ui_has_bought` |
 
 ### 12.1 用户特征
 
