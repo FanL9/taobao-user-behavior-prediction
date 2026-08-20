@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pyarrow.parquet as pq
 
-from src.data.clean_user_behavior import (
+from src.data.user_behavior_cleaning_pipeline import (
     BEHAVIOR_MAPPING,
     OUTPUT_COLUMNS,
     clean_user_behavior,

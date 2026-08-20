@@ -12,7 +12,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.clean_user_behavior import clean_user_behavior  # noqa: E402
+from src.data.user_behavior_cleaning_pipeline import (  # noqa: E402
+    clean_user_behavior,
+)
 
 
 DEFAULT_INPUT = PROJECT_ROOT / "data" / "raw" / "user_behavior_processed.csv"
