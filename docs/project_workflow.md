@@ -8,6 +8,7 @@
 | --- | --- | --- | --- |
 | 2026-08-20 | Member 1 | v1.0 | 完成阶段一项目流程整理 |
 | 2026-08-20 | Member 1 | v1.1 | 新增阶段二特征口径、中间表结构和特征字典代码 |
+| 2026-08-20 | Member 1 | v1.2 | 完成阶段一产物检查并生成阶段二特征字典与表结构 |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -33,13 +34,13 @@
 
 ### 3. 数据质量检查与清洗
 
-- 实现分块读取、质量检查、异常处理、去重和字段标准化 → `src/data/user_behavior_cleaning_pipeline.py`
+- 实现分块读取、质量检查、重复诊断、异常高频处理和字段标准化 → `src/data/user_behavior_cleaning_pipeline.py`
 - 提供清洗流程的命令行入口并组织输出 → `scripts/run_user_behavior_cleaning.py`
 - 验证清洗规则、去重、字段类型和输出一致性 → `tests/test_clean_user_behavior.py`
 - 为清洗自动化测试提供小型输入样本 → `tests/fixtures/user_behavior_sample.csv`
 - 生成标准清洗 CSV 表 → `data/processed/user_behavior_clean.csv`
 - 生成标准清洗 Parquet 表 → `data/processed/user_behavior_clean.parquet`
-- 输出数据规模、缺失值、非法值、字段值重复和清洗前后对比指标 → `outputs/user_behavior_cleaning_report.json`
+- 保留旧版全量去重结果供历史追溯，不作为当前口径 → `outputs/user_behavior_cleaning_report.json` （已废弃）
 - 汇总数据质量问题、处理规则和清洗结果 → `reports/member2_data_quality_report.md`
 
 ### 4. 基础行为统计与 EDA
@@ -47,15 +48,15 @@
 - 统计行为、用户、商品、类目、时间和转化漏斗 → `sql/basic_analysis/basic_behavior_statistics.sql`
 - 输出四类行为的数量与占比表 → `data/interim/behavior_distribution.csv`
 - 输出总行为、购买、购买用户、未购买用户和复购用户统计表 → `data/interim/behavior_statistics.csv`
-- 输出每个商品的浏览、收藏、加购和购买次数表 → `data/interim/item_statistics.csv` （尚未落盘）
-- 输出购买次数前 10 的热门商品表 → `data/interim/top_10_item.csv` （尚未落盘）
+- 输出每个商品的浏览、收藏、加购和购买次数表 → `data/interim/item_statistics.csv`
+- 输出购买次数前 10 的热门商品表 → `data/interim/top_10_item.csv`
 - 输出类目行为量、购买量和购买占比表 → `data/interim/category_statistics.csv`
-- 输出购买次数前 10 的热门类目表 → `data/interim/top_10_category.csv` （尚未落盘）
+- 输出购买次数前 10 的热门类目表 → `data/interim/top_10_category.csv`
 - 输出按日期汇总的行为量表 → `data/interim/daily_behavior.csv`
 - 输出按小时汇总的行为量表 → `data/interim/hourly_behavior.csv`
 - 输出各小时四类行为的分布表 → `data/interim/behavior_hourly_distribution.csv`
 - 输出浏览、收藏、加购和购买的描述性漏斗表 → `data/interim/descriptive_funnel.csv`
-- 汇总基础行为统计结果和业务结论 → `reports/member3_data_basic_behavior_statistics.md`
+- 汇总基础行为统计结果和业务结论 → `reports/member3_data_basic_behavior_statistics.md` （需按当前 clean 口径更新）
 
 ### 5. 完整执行顺序
 
@@ -68,8 +69,8 @@
 - 统一统计窗口、粒度、时间和转化率口径，并定义用户、商品、类目和时间中间表字段 → `src/features/stage2_feature_specification.py`
 - 校验 clean 输入字段并导出特征字典和中间表结构 → `scripts/export_stage2_feature_specification.py`
 - 验证主键定义、输入字段和规格文件导出逻辑 → `tests/test_stage2_feature_specification.py`
-- 生成用户、商品、类目和时间特征字典 → `data/features/stage2_feature_dictionary.csv` （本次未运行）
-- 生成四类中间表的主键、粒度和字段结构 → `data/features/stage2_intermediate_table_schemas.json` （本次未运行）
+- 生成用户、商品、类目和时间特征字典 → `data/features/stage2_feature_dictionary.csv`
+- 生成四类中间表的主键、粒度和字段结构 → `data/features/stage2_intermediate_table_schemas.json`
 - 后续生成用户维度中间表 → `data/features/user_features.parquet` （尚未实现）
 - 后续生成商品维度中间表 → `data/features/item_features.parquet` （尚未实现）
 - 后续生成类目维度中间表 → `data/features/category_features.parquet` （尚未实现）

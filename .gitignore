@@ -17,8 +17,6 @@ data/interim/*.csv
 data/interim/*.parquet
 data/processed/*.csv
 data/processed/*.parquet
-data/features/*.csv
-data/features/*.parquet
 data/splits/*.csv
 data/splits/*.parquet
 data/predictions/*.csv
