@@ -56,6 +56,9 @@ OUTPUT_SCHEMAS = {
             ("user_unique_item_count", pa.int64()),
             ("user_unique_category_count", pa.int64()),
             ("user_active_day_count", pa.int32()),
+            ("user_avg_daily_behavior_count", pa.float64()),
+            ("user_activity_level", pa.string()),
+            ("user_behavior_span_hours", pa.float64()),
             ("user_first_behavior_time", pa.timestamp("ns")),
             ("user_last_behavior_time", pa.timestamp("ns")),
             ("user_recency_hours", pa.float64()),
@@ -104,6 +107,8 @@ OUTPUT_SCHEMAS = {
             ("behavior_date", pa.date32()),
             ("behavior_hour", pa.uint8()),
             ("weekday", pa.uint8()),
+            ("is_weekend", pa.uint8()),
+            ("time_period", pa.string()),
             ("time_total_count", pa.int64()),
             ("time_pv_count", pa.int64()),
             ("time_fav_count", pa.int64()),
@@ -249,6 +254,47 @@ def build_user_features(clean: pa.Table) -> pa.Table:
         "user_active_day_count",
         pc.cast(grouped["user_active_day_count"], pa.int32()),
     )
+    grouped = grouped.append_column(
+        "user_avg_daily_behavior_count",
+        pc.divide(
+            pc.cast(grouped["user_total_count"], pa.float64()),
+            pc.cast(grouped["user_active_day_count"], pa.float64()),
+        ),
+    )
+
+    total_counts = sorted(grouped["user_total_count"].to_pylist())
+    count_size = len(total_counts)
+    middle = count_size // 2
+    if count_size % 2:
+        activity_median = float(total_counts[middle])
+    else:
+        activity_median = (
+            float(total_counts[middle - 1]) + float(total_counts[middle])
+        ) / 2.0
+
+    grouped = grouped.append_column(
+        "user_activity_level",
+        pc.if_else(
+            pc.greater_equal(
+                pc.cast(grouped["user_total_count"], pa.float64()),
+                pa.scalar(activity_median, type=pa.float64()),
+            ),
+            pa.scalar("high", type=pa.string()),
+            pa.scalar("low", type=pa.string()),
+        ),
+    )
+
+    first_ns = pc.cast(grouped["user_first_behavior_time"], pa.int64())
+    last_ns = pc.cast(grouped["user_last_behavior_time"], pa.int64())
+
+    grouped = grouped.append_column(
+        "user_behavior_span_hours",
+        pc.divide(
+            pc.cast(pc.subtract(last_ns, first_ns), pa.float64()),
+            pa.scalar(3_600_000_000_000.0, type=pa.float64()),
+        ),
+    )
+
     grouped = grouped.append_column(
         "user_recency_hours", _recency_hours(grouped["user_last_behavior_time"])
     )
@@ -425,6 +471,30 @@ def build_time_features(clean: pa.Table) -> pa.Table:
         "behavior_date",
         _date32(grouped["behavior_date"]),
     )
+    grouped = grouped.append_column(
+        "is_weekend",
+        pc.cast(
+            pc.greater_equal(grouped["weekday"], pa.scalar(5, type=pa.uint8())),
+            pa.uint8(),
+        ),
+    )
+
+    hour = grouped["behavior_hour"]
+    time_period = pc.if_else(
+        pc.less(hour, pa.scalar(6, type=pa.uint8())),
+        pa.scalar("night", type=pa.string()),
+        pc.if_else(
+            pc.less(hour, pa.scalar(12, type=pa.uint8())),
+            pa.scalar("morning", type=pa.string()),
+            pc.if_else(
+                pc.less(hour, pa.scalar(18, type=pa.uint8())),
+                pa.scalar("afternoon", type=pa.string()),
+                pa.scalar("evening", type=pa.string()),
+            ),
+        ),
+    )
+    grouped = grouped.append_column("time_period", time_period)
+
     grouped = grouped.append_column(
         "time_buy_to_pv_rate",
         _safe_rate(grouped["time_buy_count"], grouped["time_pv_count"]),

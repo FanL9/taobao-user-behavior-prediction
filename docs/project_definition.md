@@ -215,7 +215,7 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | --- | --- | --- | --- | --- |
 | 用户特征表 | `data/features/user_features.parquet` | 每用户一行 | `user_id` | 已生成，10,000 行 |
 | 时间特征表 | `data/features/time_features.parquet` | 每日每小时一行 | `behavior_date + behavior_hour` | 已生成，744 行 |
-| 用户序列特征表 | `data/features/user_sequence_features.parquet` | 每用户一行 | `user_id` | 尚未生成 |
+| 用户序列特征表 | `data/features/user_sequence_features.parquet` | 每用户一行 | `user_id` | 已生成，10,000 行 |
 | 商品特征表 | `data/features/item_features.parquet` | 每商品一行 | `item_id` | 已生成，2,876,947 行 |
 | 类目特征表 | `data/features/category_features.parquet` | 每类目一行 | `category_id` | 已生成，8,916 行 |
 | 商品转化链路表 | `data/features/item_conversion_features.parquet` | 每商品一行 | `item_id` | 尚未生成 |
@@ -244,10 +244,11 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 
 | 表 | 当前字段 |
 | --- | --- |
-| `user_features` | `user_id`, `user_total_count`, `user_pv_count`, `user_fav_count`, `user_cart_count`, `user_buy_count`, `user_unique_item_count`, `user_unique_category_count`, `user_active_day_count`, `user_first_behavior_time`, `user_last_behavior_time`, `user_recency_hours`, `user_fav_to_pv_rate`, `user_cart_to_pv_rate`, `user_buy_to_pv_rate`, `user_is_buyer`, `user_is_repeat_buyer` |
+| `user_features` | `user_id`, `user_total_count`, `user_pv_count`, `user_fav_count`, `user_cart_count`, `user_buy_count`, `user_unique_item_count`, `user_unique_category_count`, `user_active_day_count`, `user_avg_daily_behavior_count`, `user_activity_level`, `user_behavior_span_hours`, `user_first_behavior_time`, `user_last_behavior_time`, `user_recency_hours`, `user_fav_to_pv_rate`, `user_cart_to_pv_rate`, `user_buy_to_pv_rate`, `user_is_buyer`, `user_is_repeat_buyer` |
 | `item_features` | `item_id`, `category_id`, `item_total_count`, `item_pv_count`, `item_fav_count`, `item_cart_count`, `item_buy_count`, `item_unique_user_count`, `item_unique_buyer_count`, `item_active_day_count`, `item_fav_to_pv_rate`, `item_cart_to_pv_rate`, `item_buy_to_pv_rate` |
 | `category_features` | `category_id`, `category_total_count`, `category_pv_count`, `category_fav_count`, `category_cart_count`, `category_buy_count`, `category_unique_user_count`, `category_unique_item_count`, `category_unique_buyer_count`, `category_fav_to_pv_rate`, `category_cart_to_pv_rate`, `category_buy_to_pv_rate` |
-| `time_features` | `behavior_date`, `behavior_hour`, `weekday`, `time_total_count`, `time_pv_count`, `time_fav_count`, `time_cart_count`, `time_buy_count`, `time_unique_user_count`, `time_unique_item_count`, `time_buy_to_pv_rate` |
+| `time_features` | `behavior_date`, `behavior_hour`, `weekday`, `is_weekend`, `time_period`, `time_total_count`, `time_pv_count`, `time_fav_count`, `time_cart_count`, `time_buy_count`, `time_unique_user_count`, `time_unique_item_count`, `time_buy_to_pv_rate` |
+| `user_sequence_features` | `user_id`, `sequence_recent_10_behavior_types`, `sequence_avg_behavior_gap_hours`, `sequence_has_pv_cart`, `sequence_has_pv_fav`, `sequence_has_pv_buy`, `sequence_has_pv_cart_buy` |
 | `user_item_features` | `user_id`, `item_id`, `ui_pv_count`, `ui_fav_count`, `ui_cart_count`, `ui_buy_count`, `ui_last_interaction_time`, `ui_last_interaction_date`, `ui_last_interaction_hour`, `ui_has_bought` |
 
 ### 12.1 用户特征
@@ -284,8 +285,13 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 - 因时间仅精确到小时，同小时内的真实行为顺序不可恢复。
 - 为保证代码可复现，序列按 `time, item_id, behavior_type` 升序确定性排序，但必须在报告中标注为近似序列。
 - 最近序列统一取最近 10 个 `behavior_type`。
-- 浏览到加购/购买链路按同一用户、同一商品且 `pv_time <= cart_time/buy_time` 判定。
-- 完整链路按同一用户、同一商品且 `pv_time <= cart_time <= buy_time` 判定。
+- 最近行为序列字段名为 `sequence_recent_10_behavior_types`，按上述确定性顺序保存最近最多 10 个行为类型。
+- 用户行为间隔字段名为 `sequence_avg_behavior_gap_hours`，定义为相邻两次确定性排序行为时间差的平均小时数；用户只有 1 条行为时记为 `0.0`。
+- `sequence_has_pv_cart`：同一用户、同一商品存在 `pv_time <= cart_time` 时记为 1，否则为 0。
+- `sequence_has_pv_fav`：同一用户、同一商品存在 `pv_time <= fav_time` 时记为 1，否则为 0。
+- `sequence_has_pv_buy`：同一用户、同一商品存在 `pv_time <= buy_time` 时记为 1，否则为 0。
+- `sequence_has_pv_cart_buy`：同一用户、同一商品存在 `pv_time <= cart_time <= buy_time` 时记为 1，否则为 0。
+- 上述链路均为观察窗口内是否曾出现该关系的用户级 0/1 特征。
 
 ### 12.5 用户-商品交互特征
 
