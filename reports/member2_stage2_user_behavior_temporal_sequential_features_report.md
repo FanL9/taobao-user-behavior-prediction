@@ -7,7 +7,7 @@
 ## 1. 数据说明
 - 输入：`user_behavior_clean.parquet`,`user_features.parquet`
 - 输出：`user_active_level.cvs`, `time_feature_hourly_weekly.csv`, `peak_hour_features.csv`, `user_sequence_features.csv`
-- python: `basic_behavior_statistics`
+- python: `user_behavior_temporal_sequential_feature.py`
 
 ## 2. 统计四类行为分布：
 ### 2.1 任务：
