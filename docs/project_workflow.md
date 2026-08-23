@@ -13,6 +13,8 @@
 | 2026-08-20 | Member 1 | v1.4 | 同步统一口径、项目流程和精简 README |
 | 2026-08-20 | Member 1 | v1.5 | 删除独立规格代码和字典输出，特征口径统一收口到 `project_definition.md` |
 | 2026-08-20 | Member 1 | v1.6 | 新增用户-商品交互特征表 |
+| 2026-08-23 | Member 1 | v1.7 | 补充 Member 2/3 阶段二交付、校验结果和未完成项 |
+| 2026-08-23 | Member 1 | v1.8 | 完成高峰、热度、转化特征、Member 2/3 校验和 82 列初版宽表 |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -60,7 +62,7 @@
 - 输出按小时汇总的行为量表 → `data/interim/hourly_behavior.csv`
 - 输出各小时四类行为的分布表 → `data/interim/behavior_hourly_distribution.csv`
 - 输出浏览、收藏、加购和购买的描述性漏斗表 → `data/interim/descriptive_funnel.csv`
-- 汇总基础行为统计结果和业务结论 → `reports/member3_data_basic_behavior_statistics.md` （需按当前 clean 口径更新）
+- 汇总基础行为统计结果和业务结论 → `reports/member3_stage1_data_basic_behavior_statistics_report.md`
 
 ### 5. 完整执行顺序
 
@@ -81,6 +83,57 @@
 - 生成 744 行日期-小时维度中间表 → `data/features/time_features.parquet`
 - 按 `user_id + item_id` 生成 4,686,904 行四类交互数、最近交互时间和购买标记 → `data/features/user_item_features.parquet`
 
-### 2. 当前执行顺序
+### 2. Member 2：用户、时间与序列特征
 
-`data/processed/user_behavior_clean.parquet` → `scripts/build_stage2_intermediate_tables.py` → `data/features/`
+- 在基础构建中补充用户日均行为、高低活跃分层和行为跨度 → `src/features/stage2_intermediate_tables.py`
+- 在时间表中补充工作日/周末、时段和 P80 高峰小时特征 → `src/features/stage2_intermediate_tables.py`
+- 按用户构建最近 10 次行为、平均间隔和同商品转化链路标记 → `scripts/build_member2_stage2_features.py`
+- 生成 10,000 行用户特征表 → `data/features/user_features.parquet`
+- 生成 744 行日期-小时特征表 → `data/features/time_features.parquet`
+- 生成 10,000 行用户序列特征表 → `data/features/user_sequence_features.parquet`
+- 用户、时间和序列构建代码内置主键、必需字段、数值范围和序列合法性检查，当前状态为 `PASS`
+- 汇总正式 Member 2 口径、结果和质量检查 → `reports/member2_stage2_feature_report.md`
+
+补充产物 `user_active_level.csv`、`time_feature_hourly_weekly.csv`、`peak_hour_features.csv` 和 `user_sequence_features.csv` 使用了与正式 Parquet 不同的 P20/P80、N=5 及相邻转移口径，因此不作为后续宽表的正式输入。正式高峰小时特征已写入 `time_features.parquet`。
+
+### 3. Member 3：商品、类目与转化特征
+
+- 生成 2,876,947 行商品特征表，并按 Q25/Q75 写入热度分层 → `data/features/item_features.parquet`
+- 生成 8,916 行类目特征表，并按 Q25/Q75 写入热门/长尾分层 → `data/features/category_features.parquet`
+- 从商品特征构建商品粒度和全局转化特征 → `src/features/conversion_features.py`
+- 提供 Member 3 非看板特征构建入口 → `scripts/build_member3_stage2_features.py`
+- 生成 2,876,947 行商品转化链路表 → `data/features/item_conversion_features.parquet`
+- 生成 1 行全局描述性转化漏斗 → `data/features/conversion_features.parquet`
+- 转化特征构建代码内置主键、分层、比率、商品集合和跨表总量检查，当前状态为 `PASS`
+- 记录 Member 3 非看板特征口径、结果和质量检查 → `reports/member3_stage2_feature_report.md`
+
+### 4. Member 1：初版特征宽表整合
+
+- 以用户-商品交互表为基表，左连接用户、序列、商品、类目、时间和转化特征 → `src/features/stage2_feature_table.py`
+- 提供宽表构建和自动校验入口 → `scripts/build_stage2_feature_table.py`
+- 生成 4,686,904 行、82 列初版特征宽表 → `data/features/user_item_feature_table.parquet`
+- 检查主键、全表缺失、计数、比率、标记、分类和成员输出一致性，当前状态为 `PASS` → `outputs/stage2_feature_table_validation.json`
+- 记录宽表来源、连接方式和质量结果 → `reports/stage2_feature_table_report.md`
+
+### 5. 当前执行顺序
+
+```text
+data/processed/user_behavior_clean.parquet
+    → python scripts/build_stage2_intermediate_tables.py
+    → python scripts/build_member2_stage2_features.py
+    → python scripts/build_member3_stage2_features.py
+    → python scripts/build_stage2_feature_table.py
+```
+
+看板不在本次阶段二非看板交付的完成判定范围内。
+
+### 6. 辅助产物生成
+
+`scr/` 中的脚本不是复现核心数据流的必跑步骤，只在需要刷新报告或看板数据时运行：
+
+```text
+python scr/build_member2_stage2_report.py
+python scr/build_member3_stage2_report.py
+python scr/build_stage2_feature_table_report.py
+python scr/build_dashboard_data.py
+```

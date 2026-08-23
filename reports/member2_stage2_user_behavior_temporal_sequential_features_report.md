@@ -4,10 +4,12 @@
 
 # Member 2 用户行为特征、时间特征与序列特征
 
+> 本报告记录 P20/P80、N=5 和相邻转移的补充分析口径。正式阶段二口径和 Parquet 交付以 `docs/project_definition.md` 和 `reports/member2_stage2_feature_report.md` 为准；本报告对应的 CSV 不用于最终特征宽表。
+
 ## 1. 数据说明
 - 输入：`user_behavior_clean.parquet`,`user_features.parquet`
-- 输出：`user_active_level.cvs`, `time_feature_hourly_weekly.csv`, `peak_hour_features.csv`, `user_sequence_features.csv`
-- python: `user_behavior_temporal_sequential_feature.py`
+- 输出：`user_active_level.csv`, `time_feature_hourly_weekly.csv`, `peak_hour_features.csv`, `user_sequence_features.csv`
+- python: `scr/build_legacy_member2_csv_features.py`
 
 ---
 
@@ -39,7 +41,7 @@
 - low_active = total_behavior_count < P20
 
 ### 3.3 输出：
-- `user_active_level.cvs`
+- `user_active_level.csv`
 - 前 5 个 observations：
 
 | user_id | active_days | avg_daily_behavior | last_active_time | behavior_span_days | activity_level |

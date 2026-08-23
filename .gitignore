@@ -24,6 +24,7 @@ data/predictions/*.parquet
 
 # Large user-item feature table (generate locally)
 data/features/user_item_features.parquet
+data/features/user_item_feature_table.parquet
 
 # Local databases
 database/*.db

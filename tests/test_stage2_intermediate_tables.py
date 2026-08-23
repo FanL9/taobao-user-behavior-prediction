@@ -75,6 +75,23 @@ class Stage2IntermediateTableTests(unittest.TestCase):
             self.assertEqual(first_user["user_buy_count"], 1)
             self.assertEqual(first_user["user_buy_to_pv_rate"], 0.5)
 
+            item = pq.read_table(result.output_paths["item_features"])
+            item_levels = set(item["item_popularity_level"].to_pylist())
+            self.assertTrue(item_levels.issubset({"low", "medium", "high"}))
+            self.assertEqual(item_levels, {"low", "high"})
+
+            category = pq.read_table(result.output_paths["category_features"])
+            category_levels = set(category["category_popularity_level"].to_pylist())
+            self.assertTrue(
+                category_levels.issubset({"long_tail", "medium", "popular"})
+            )
+            self.assertEqual(category_levels, {"long_tail", "popular"})
+
+            time_features = pq.read_table(result.output_paths["time_features"])
+            peak_values = set(time_features["time_is_peak_hour"].to_pylist())
+            self.assertTrue(peak_values.issubset({0, 1}))
+            self.assertEqual(sum(time_features["time_is_peak_hour"].to_pylist()), 2)
+
             user_item = pq.read_table(result.output_paths["user_item_features"])
             interaction = user_item.filter(
                 pa.compute.and_(

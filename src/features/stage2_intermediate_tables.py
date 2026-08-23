@@ -81,6 +81,7 @@ OUTPUT_SCHEMAS = {
             ("item_unique_user_count", pa.int64()),
             ("item_unique_buyer_count", pa.int64()),
             ("item_active_day_count", pa.int32()),
+            ("item_popularity_level", pa.string()),
             ("item_fav_to_pv_rate", pa.float64()),
             ("item_cart_to_pv_rate", pa.float64()),
             ("item_buy_to_pv_rate", pa.float64()),
@@ -97,6 +98,7 @@ OUTPUT_SCHEMAS = {
             ("category_unique_user_count", pa.int64()),
             ("category_unique_item_count", pa.int64()),
             ("category_unique_buyer_count", pa.int64()),
+            ("category_popularity_level", pa.string()),
             ("category_fav_to_pv_rate", pa.float64()),
             ("category_cart_to_pv_rate", pa.float64()),
             ("category_buy_to_pv_rate", pa.float64()),
@@ -109,6 +111,7 @@ OUTPUT_SCHEMAS = {
             ("weekday", pa.uint8()),
             ("is_weekend", pa.uint8()),
             ("time_period", pa.string()),
+            ("time_is_peak_hour", pa.uint8()),
             ("time_total_count", pa.int64()),
             ("time_pv_count", pa.int64()),
             ("time_fav_count", pa.int64()),
@@ -191,6 +194,39 @@ def _rename(table: pa.Table, names: Iterable[str]) -> pa.Table:
 
 def _sort(table: pa.Table, keys: Iterable[str]) -> pa.Table:
     return table.sort_by([(key, "ascending") for key in keys])
+
+
+def _linear_quantile(values: pa.ChunkedArray, quantile: float) -> float:
+    """Return a deterministic linearly interpolated quantile."""
+    ordered = sorted(float(value) for value in values.to_pylist())
+    if not ordered:
+        raise ValueError("Cannot calculate a quantile for an empty array")
+    position = (len(ordered) - 1) * quantile
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def _three_level_segment(
+    values: pa.ChunkedArray,
+    *,
+    low_label: str,
+    middle_label: str,
+    high_label: str,
+) -> pa.Array:
+    q25 = _linear_quantile(values, 0.25)
+    q75 = _linear_quantile(values, 0.75)
+    numeric = pc.cast(values, pa.float64())
+    return pc.if_else(
+        pc.less_equal(numeric, q25),
+        pa.scalar(low_label, type=pa.string()),
+        pc.if_else(
+            pc.less(numeric, q75),
+            pa.scalar(middle_label, type=pa.string()),
+            pa.scalar(high_label, type=pa.string()),
+        ),
+    )
 
 
 def _date32(values: pa.ChunkedArray) -> pa.Array | pa.ChunkedArray:
@@ -380,6 +416,15 @@ def build_item_features(clean: pa.Table) -> pa.Table:
         join_type="left outer",
     )
     grouped = grouped.append_column(
+        "item_popularity_level",
+        _three_level_segment(
+            grouped["item_total_count"],
+            low_label="low",
+            middle_label="medium",
+            high_label="high",
+        ),
+    )
+    grouped = grouped.append_column(
         "item_fav_to_pv_rate",
         _safe_rate(grouped["item_fav_count"], grouped["item_pv_count"]),
     )
@@ -420,6 +465,15 @@ def build_category_features(clean: pa.Table) -> pa.Table:
             "category_unique_item_count",
             "category_unique_buyer_count",
         ],
+    )
+    grouped = grouped.append_column(
+        "category_popularity_level",
+        _three_level_segment(
+            grouped["category_total_count"],
+            low_label="long_tail",
+            middle_label="medium",
+            high_label="popular",
+        ),
     )
     grouped = grouped.append_column(
         "category_fav_to_pv_rate",
@@ -494,6 +548,21 @@ def build_time_features(clean: pa.Table) -> pa.Table:
         ),
     )
     grouped = grouped.append_column("time_period", time_period)
+
+    hourly_totals = grouped.group_by("behavior_hour").aggregate(
+        [("time_total_count", "sum")]
+    )
+    peak_threshold = _linear_quantile(hourly_totals["time_total_count_sum"], 0.80)
+    peak_hours = hourly_totals.filter(
+        pc.greater_equal(
+            pc.cast(hourly_totals["time_total_count_sum"], pa.float64()),
+            peak_threshold,
+        )
+    )["behavior_hour"]
+    grouped = grouped.append_column(
+        "time_is_peak_hour",
+        pc.cast(pc.is_in(hour, value_set=peak_hours), pa.uint8()),
+    )
 
     grouped = grouped.append_column(
         "time_buy_to_pv_rate",

@@ -204,10 +204,15 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 特征命名 | 使用 snake_case，按粒度使用 `user_`、`item_`、`category_`、`time_`、`sequence_`、`conversion_`、`ui_` 前缀 |
 | 主键 | ID 字段使用 `int64`，主键不允许缺失或重复 |
 | 连接后缺失 | 计数和比率填 `0`，布尔/0-1 标记填 `0`，分层字段填 `unknown` |
-| 大表格式 | Parquet；`data/features/` 中的特征表允许上传 Git |
+| 大表格式 | Parquet；`user_item_features.parquet` 和 `user_item_feature_table.parquet` 只在本地生成，其他特征表可按 Git 规则上传 |
 | 口径与字段来源 | 本文件是唯一口径来源，不再另行维护特征字典代码或规格文件 |
-| 四表构建实现 | `src/features/stage2_intermediate_tables.py` |
-| 四表运行入口 | `scripts/build_stage2_intermediate_tables.py` |
+| 基础聚合表构建实现 | `src/features/stage2_intermediate_tables.py` |
+| 基础聚合表运行入口 | `scripts/build_stage2_intermediate_tables.py` |
+| 用户序列表构建入口 | `scripts/build_member2_stage2_features.py` |
+| Member 3 转化特征实现 | `src/features/conversion_features.py` |
+| Member 3 运行入口 | `scripts/build_member3_stage2_features.py` |
+| 初版宽表实现 | `src/features/stage2_feature_table.py` |
+| 初版宽表运行入口 | `scripts/build_stage2_feature_table.py` |
 
 ## 11. 阶段二中间表、粒度和键
 
@@ -218,11 +223,20 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 用户序列特征表 | `data/features/user_sequence_features.parquet` | 每用户一行 | `user_id` | 已生成，10,000 行 |
 | 商品特征表 | `data/features/item_features.parquet` | 每商品一行 | `item_id` | 已生成，2,876,947 行 |
 | 类目特征表 | `data/features/category_features.parquet` | 每类目一行 | `category_id` | 已生成，8,916 行 |
-| 商品转化链路表 | `data/features/item_conversion_features.parquet` | 每商品一行 | `item_id` | 尚未生成 |
+| 商品转化链路表 | `data/features/item_conversion_features.parquet` | 每商品一行 | `item_id` | 已生成，2,876,947 行 |
+| 全局转化漏斗表 | `data/features/conversion_features.parquet` | 全局一行 | `conversion_scope` | 已生成，1 行 |
 | 用户-商品交互表 | `data/features/user_item_features.parquet` | 每用户-商品一行 | `user_id + item_id` | 已生成，4,686,904 行 |
-| 用户-商品特征宽表 | `data/features/user_item_feature_table.parquet` | 每用户-商品一行 | `user_id + item_id` | 尚未生成 |
+| 用户-商品特征宽表 | `data/features/user_item_feature_table.parquet` | 每用户-商品一行 | `user_id + item_id` | 已生成，4,686,904 行、82 列 |
 
-### 11.1 外键和连接规则
+### 11.1 阶段二分工交付状态（2026-08-23 检查）
+
+| 成员 | 已完成并验证 | 仍需补充 |
+| --- | --- | --- |
+| Member 2 | 用户、时间、高峰小时和序列特征已生成；主键、必需字段、非负值、0/1 标记和用户集合校验为 `PASS` | 非看板范围无 |
+| Member 3 | 商品/类目基础特征、Q25/Q75 热度分层、商品粒度转化链路、全局漏斗、质量检查和正式报告已完成，校验为 `PASS` | 非看板范围无 |
+| Member 1 整合 | 用户、序列、商品、类目、时间、用户-商品和转化特征已整合为 82 列初版宽表，校验为 `PASS` | 待正式建模口径确定后再构建标签和时间切分 |
+
+### 11.2 外键和连接规则
 
 1. 宽表以 `user_item_features` 为唯一基表。
 2. 用户特征表和序列特征表按 `user_id` 连接。
@@ -231,25 +245,28 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 5. 时间特征表按 `last_interaction_date + last_interaction_hour` 对应 `behavior_date + behavior_hour` 连接。
 6. 全部使用左连接，右表在连接前必须保证连接键唯一。
 7. 每次连接后行数必须与基表相同，`user_id + item_id` 必须仍然唯一，禁止多对多连接。
+8. 序列表的最近 10 次行为在原表中保留 `list<int64>`；宽表中为支持 Arrow 连接，编码为 `1|2|3|4` 形式的字符串。
 
-### 11.2 商品与类目关系
+### 11.3 商品与类目关系
 
 商品表按 `item_id` 唯一。如同一商品对应多个 `category_id`，取该商品中出现次数最多的类目；如出现次数并列，取最小 `category_id`。
 
 ## 12. 阶段二具体特征口径
 
-> 当前已生成的四张表是基础版，字段以下表为准。日均行为、活跃分层、时段、热度分层和序列等特征由对应成员后续补充，补充时必须先更新本文件。
+> 当前已生成的正式特征表字段以下表为准。补充 CSV 不取代正式 Parquet；新增字段或分层时必须先更新本文件。
 
 ### 12.0 当前基础表字段
 
 | 表 | 当前字段 |
 | --- | --- |
 | `user_features` | `user_id`, `user_total_count`, `user_pv_count`, `user_fav_count`, `user_cart_count`, `user_buy_count`, `user_unique_item_count`, `user_unique_category_count`, `user_active_day_count`, `user_avg_daily_behavior_count`, `user_activity_level`, `user_behavior_span_hours`, `user_first_behavior_time`, `user_last_behavior_time`, `user_recency_hours`, `user_fav_to_pv_rate`, `user_cart_to_pv_rate`, `user_buy_to_pv_rate`, `user_is_buyer`, `user_is_repeat_buyer` |
-| `item_features` | `item_id`, `category_id`, `item_total_count`, `item_pv_count`, `item_fav_count`, `item_cart_count`, `item_buy_count`, `item_unique_user_count`, `item_unique_buyer_count`, `item_active_day_count`, `item_fav_to_pv_rate`, `item_cart_to_pv_rate`, `item_buy_to_pv_rate` |
-| `category_features` | `category_id`, `category_total_count`, `category_pv_count`, `category_fav_count`, `category_cart_count`, `category_buy_count`, `category_unique_user_count`, `category_unique_item_count`, `category_unique_buyer_count`, `category_fav_to_pv_rate`, `category_cart_to_pv_rate`, `category_buy_to_pv_rate` |
-| `time_features` | `behavior_date`, `behavior_hour`, `weekday`, `is_weekend`, `time_period`, `time_total_count`, `time_pv_count`, `time_fav_count`, `time_cart_count`, `time_buy_count`, `time_unique_user_count`, `time_unique_item_count`, `time_buy_to_pv_rate` |
+| `item_features` | `item_id`, `category_id`, `item_total_count`, `item_pv_count`, `item_fav_count`, `item_cart_count`, `item_buy_count`, `item_unique_user_count`, `item_unique_buyer_count`, `item_active_day_count`, `item_popularity_level`, `item_fav_to_pv_rate`, `item_cart_to_pv_rate`, `item_buy_to_pv_rate` |
+| `category_features` | `category_id`, `category_total_count`, `category_pv_count`, `category_fav_count`, `category_cart_count`, `category_buy_count`, `category_unique_user_count`, `category_unique_item_count`, `category_unique_buyer_count`, `category_popularity_level`, `category_fav_to_pv_rate`, `category_cart_to_pv_rate`, `category_buy_to_pv_rate` |
+| `time_features` | `behavior_date`, `behavior_hour`, `weekday`, `is_weekend`, `time_period`, `time_is_peak_hour`, `time_total_count`, `time_pv_count`, `time_fav_count`, `time_cart_count`, `time_buy_count`, `time_unique_user_count`, `time_unique_item_count`, `time_buy_to_pv_rate` |
 | `user_sequence_features` | `user_id`, `sequence_recent_10_behavior_types`, `sequence_avg_behavior_gap_hours`, `sequence_has_pv_cart`, `sequence_has_pv_fav`, `sequence_has_pv_buy`, `sequence_has_pv_cart_buy` |
 | `user_item_features` | `user_id`, `item_id`, `ui_pv_count`, `ui_fav_count`, `ui_cart_count`, `ui_buy_count`, `ui_last_interaction_time`, `ui_last_interaction_date`, `ui_last_interaction_hour`, `ui_has_bought` |
+| `item_conversion_features` | `item_id`, `conversion_pv_count`, `conversion_fav_count`, `conversion_cart_count`, `conversion_buy_count`, `conversion_pv_to_fav_rate`, `conversion_pv_to_cart_rate`, `conversion_pv_to_buy_rate`, `conversion_fav_to_buy_rate`, `conversion_cart_to_buy_rate`, `conversion_has_full_funnel` |
+| `conversion_features` | `conversion_scope`, `item_count`, `full_funnel_item_count`, `pv_count`, `fav_count`, `cart_count`, `buy_count`, `pv_to_fav_rate`, `pv_to_cart_rate`, `pv_to_buy_rate`, `fav_to_buy_rate`, `cart_to_buy_rate` |
 
 ### 12.1 用户特征
 
@@ -272,13 +289,16 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | --- | --- |
 | 商品行为 | 按 `item_id` 分组的总行为数、四类行为数、去重用户数、去重购买用户数和活跃天数 |
 | 类目行为 | 按 `category_id` 分组的总行为数、四类行为数、去重用户数、去重商品数和去重购买用户数 |
-| 商品热度 | `item_total_count < Q25` 为 `low`，`Q25–Q75` 为 `medium`，`>= Q75` 为 `high` |
-| 类目热度 | `category_total_count < Q25` 为 `long_tail`，`Q25–Q75` 为 `medium`，`>= Q75` 为 `popular` |
+| 商品热度 | `item_total_count <= Q25` 为 `low`，`Q25 < count < Q75` 为 `medium`，`>= Q75` 为 `high` |
+| 类目热度 | `category_total_count <= Q25` 为 `long_tail`，`Q25 < count < Q75` 为 `medium`，`>= Q75` 为 `popular` |
+
+上述分层已分别写入 `item_popularity_level` 和 `category_popularity_level`。
 
 ### 12.3 时间特征
 
 - 粒度为 `behavior_date + behavior_hour`。
 - 包含工作日/周末、时段、总行为数、四类行为数、去重用户数、去重商品数和购买/浏览比率。
+- 先将观察窗内行为按 24 个小时汇总，小时总行为量 `>= P80` 的小时在 `time_is_peak_hour` 中记为 1，否则为 0；当前高峰小时为 19–23 点。
 
 ### 12.4 序列特征
 
@@ -303,6 +323,21 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 时间外键 | 从最近交互派生 `last_interaction_date + last_interaction_hour` |
 | 是否购买 | 该用户-商品组合 `buy_count >= 1` 为 1 |
 
+### 12.6 商品转化链路特征
+
+- 粒度为 `item_id`，转化行为数与 `item_features` 对应四类行为数逐项一致。
+- 包含 `fav/pv`、`cart/pv`、`buy/pv`、`buy/fav`和 `buy/cart` 五类行为次数比，分母为 0 时记为 `0.0`。
+- `conversion_has_full_funnel=1` 表示该商品的 pv/fav/cart/buy 计数均大于 0，只表示四阶段均出现，不代表用户级严格时序转化。
+- `conversion_features.parquet` 是全局一行的描述性漏斗，不代替商品粒度转化表。
+
+### 12.7 初版特征宽表
+
+- 基表为 `user_item_features.parquet`，最终粒度和主键为 `user_id + item_id`。
+- 合并用户、用户序列、商品、类目、最近交互时间、用户-商品交互和商品转化链路特征。
+- 初版宽表共 4,686,904 行、82 列；不包含未来标签、样本切分或负采样结果。
+- 检查要求：主键唯一、全表无缺失、计数非负、比率有限且非负、0/1 与分类字段合法、不同成员重复计数字段一致。
+- 当前质量检查状态为 `PASS`，详见 `reports/stage2_feature_table_report.md`。
+
 ## 13. 看板与报告口径
 
 | 项目 | 统一口径 |
@@ -314,13 +349,15 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 数值引用 | 报告中的数值必须能追溯到输出表或正式质量报告，不得手工猜测 |
 | 比率展示 | 展示时可转为百分比并四舍五入，底层表保留原始比率全精度 |
 | 历史结果 | 基于 6,213,379 行旧 clean 数据生成的 EDA 表和结论必须重算后才能用于正式看板与报告 |
+| 当前看板状态 | 看板不在本次阶段二非看板交付的完成判定范围内 |
 
 ## 14. 文件命名、输出和复现标准
 
 | 项目 | 统一口径 |
 | --- | --- |
 | Python 源码 | `src/<module>/snake_case.py` |
-| 可执行脚本 | `scripts/<verb>_<object>.py` |
+| 核心可执行脚本 | 项目拉取后复现核心数据流必须运行的入口放在 `scripts/<verb>_<object>.py` |
+| 辅助脚本 | 报告、看板数据等非必跑产物生成入口放在 `scr/<verb>_<object>.py` |
 | SQL | 按阶段放入 `sql/preprocessing/`、`sql/basic_analysis/`、`sql/intermediate/` 或 `sql/analysis/` |
 | 文档与报告 | 正式口径放 `docs/`，结果报告放 `reports/`，文件名使用英文 snake_case |
 | 过程小表 | `data/interim/` |
