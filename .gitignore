@@ -46,3 +46,7 @@ Thumbs.db
 
 # Keep directory placeholders
 !.gitkeep
+
+data/modeling/
+
+data/features/dashboard/

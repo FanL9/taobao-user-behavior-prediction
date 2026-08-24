@@ -1,0 +1,46 @@
+﻿{
+  "version": "stage3_v1",
+
+  "target_column": "label",
+
+  "key_columns": [
+    "user_id",
+    "item_id"
+  ],
+
+  "metadata_columns": [
+    "cutoff_time",
+    "label_start",
+    "label_end"
+  ],
+
+  "exclude_raw_columns": [
+    "category_id",
+    "ui_last_interaction_time",
+    "ui_last_interaction_date",
+    "user_first_behavior_time",
+    "user_last_behavior_time"
+  ],
+
+  "categorical_columns": [
+    "user_activity_level",
+    "item_popularity_level",
+    "category_popularity_level",
+    "time_period",
+    "weekday"
+  ],
+
+  "sequence_column": "sequence_recent_10_behavior_types",
+
+  "sequence_length": 10,
+
+  "sequence_behavior_values": [1, 2, 3, 4],
+
+  "notes": {
+    "1": "user_id and item_id remain sample identifiers and are not model features",
+    "2": "category_id is excluded as a raw integer identifier; category aggregate features remain",
+    "3": "raw datetime columns are excluded because engineered recency/hour/span features already exist",
+    "4": "categorical fields use fixed one-hot encoding",
+    "5": "recent behavior sequence is converted into position features and behavior counts"
+  }
+}

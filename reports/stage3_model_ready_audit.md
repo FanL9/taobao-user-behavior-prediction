@@ -1,0 +1,129 @@
+# Stage 3 Model-Ready Data Audit
+
+Overall status: **PASS**
+
+- Model feature count: 104
+- Train/valid/test schema consistent: True
+- Prediction target: historically interacted user-item pair purchases the item within the next 7 days
+- Raw identifier and future-window metadata are excluded from model features.
+
+| Split | Rows | Positive | Negative | Positive Rate | Duplicate Keys | Null/NaN/Inf | Status |
+|---|---:|---:|---:|---:|---:|---:|---|
+| train | 1,459,489 | 2,924 | 1,456,565 | 0.200344% | 0 | 0 | PASS |
+| valid | 2,507,302 | 3,243 | 2,504,059 | 0.129342% | 0 | 0 | PASS |
+| test | 3,574,665 | 9,315 | 3,565,350 | 0.260584% | 0 | 0 | PASS |
+
+## Leakage controls
+
+- Features are calculated only from behavior at or before each split cutoff.
+- Future 7-day label-window timestamps are not model features.
+- `user_id` and `item_id` are retained only as sample keys.
+- Raw `category_id` is excluded from the traditional-model feature matrix.
+- Raw datetime fields are excluded; engineered historical time features remain.
+
+## Final feature list
+
+- `ui_pv_count`
+- `ui_fav_count`
+- `ui_cart_count`
+- `ui_buy_count`
+- `ui_has_bought`
+- `user_total_count`
+- `user_pv_count`
+- `user_fav_count`
+- `user_cart_count`
+- `user_buy_count`
+- `user_unique_item_count`
+- `user_unique_category_count`
+- `user_active_day_count`
+- `user_avg_daily_behavior_count`
+- `user_behavior_span_hours`
+- `user_recency_hours`
+- `user_fav_to_pv_rate`
+- `user_cart_to_pv_rate`
+- `user_buy_to_pv_rate`
+- `user_is_buyer`
+- `user_is_repeat_buyer`
+- `sequence_avg_behavior_gap_hours`
+- `sequence_has_pv_cart`
+- `sequence_has_pv_fav`
+- `sequence_has_pv_buy`
+- `sequence_has_pv_cart_buy`
+- `item_total_count`
+- `item_pv_count`
+- `item_fav_count`
+- `item_cart_count`
+- `item_buy_count`
+- `item_unique_user_count`
+- `item_unique_buyer_count`
+- `item_active_day_count`
+- `item_fav_to_pv_rate`
+- `item_cart_to_pv_rate`
+- `item_buy_to_pv_rate`
+- `category_total_count`
+- `category_pv_count`
+- `category_fav_count`
+- `category_cart_count`
+- `category_buy_count`
+- `category_unique_user_count`
+- `category_unique_item_count`
+- `category_unique_buyer_count`
+- `category_fav_to_pv_rate`
+- `category_cart_to_pv_rate`
+- `category_buy_to_pv_rate`
+- `is_weekend`
+- `time_is_peak_hour`
+- `time_total_count`
+- `time_pv_count`
+- `time_fav_count`
+- `time_cart_count`
+- `time_buy_count`
+- `time_unique_user_count`
+- `time_unique_item_count`
+- `time_buy_to_pv_rate`
+- `conversion_pv_count`
+- `conversion_fav_count`
+- `conversion_cart_count`
+- `conversion_buy_count`
+- `conversion_pv_to_fav_rate`
+- `conversion_pv_to_cart_rate`
+- `conversion_pv_to_buy_rate`
+- `conversion_fav_to_buy_rate`
+- `conversion_cart_to_buy_rate`
+- `conversion_has_full_funnel`
+- `user_activity_level__low`
+- `user_activity_level__high`
+- `item_popularity_level__low`
+- `item_popularity_level__medium`
+- `item_popularity_level__high`
+- `category_popularity_level__long_tail`
+- `category_popularity_level__medium`
+- `category_popularity_level__popular`
+- `time_period__morning`
+- `time_period__afternoon`
+- `time_period__evening`
+- `time_period__night`
+- `weekday__0`
+- `weekday__1`
+- `weekday__2`
+- `weekday__3`
+- `weekday__4`
+- `weekday__5`
+- `weekday__6`
+- `seq_pos_1`
+- `seq_pos_2`
+- `seq_pos_3`
+- `seq_pos_4`
+- `seq_pos_5`
+- `seq_pos_6`
+- `seq_pos_7`
+- `seq_pos_8`
+- `seq_pos_9`
+- `seq_pos_10`
+- `seq_count_behavior_1`
+- `seq_count_behavior_2`
+- `seq_count_behavior_3`
+- `seq_count_behavior_4`
+- `seq_distinct_behavior_count`
+- `ui_last_interaction_hour_sin`
+- `ui_last_interaction_hour_cos`
