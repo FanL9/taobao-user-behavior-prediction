@@ -1,4 +1,4 @@
-﻿import importlib
+import importlib
 
 import streamlit as st
 
@@ -13,40 +13,72 @@ if "page" not in st.session_state:
     st.session_state.page = "home"
 
 
-st.title("淘宝用户行为分析看板")
+# =========================
+# Sidebar navigation
+# =========================
 
-st.caption("商品、类目与用户行为转化分析")
+with st.sidebar:
 
+    st.title("导航")
 
-st.write("")
+    pages = [
+        ("首页", "home"),
+        ("基础 EDA", "eda"),
+        ("用户分析", "user"),
+        ("商品分析", "item"),
+        ("类目分析", "category"),
+        ("转化分析", "conversion"),
+    ]
 
+    for label, page_name in pages:
 
-cols = st.columns(4)
+        button_type = (
+            "primary"
+            if st.session_state.page == page_name
+            else "secondary"
+        )
 
-pages = [
-    ("首页", "home"),
-    ("商品分析", "item"),
-    ("类目分析", "category"),
-    ("转化分析", "conversion"),
-]
-
-
-for col, (label, page_name) in zip(cols, pages):
-    with col:
         if st.button(
             label,
             use_container_width=True,
             key=f"nav_{page_name}",
+            type=button_type,
         ):
             st.session_state.page = page_name
             st.rerun()
 
+    st.divider()
+
+    st.caption(
+        "阶段一 EDA + 阶段二特征分析"
+    )
+
+
+# =========================
+# Main title
+# =========================
+
+st.title("淘宝用户行为分析看板")
+
+st.caption(
+    "商品、类目与用户行为转化分析"
+)
 
 st.divider()
 
 
+# =========================
+# Page routing
+# =========================
+
 if st.session_state.page == "home":
     import views.home as page
+
+elif st.session_state.page == "eda":
+    import views.eda as page
+
+elif st.session_state.page == "user":
+    import views.user as page
 
 elif st.session_state.page == "item":
     import views.item as page
@@ -64,6 +96,3 @@ else:
 
 importlib.reload(page)
 page.show()
-
-
-
