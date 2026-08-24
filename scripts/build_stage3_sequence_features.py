@@ -1,24 +1,46 @@
 ﻿from pathlib import Path
+
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 
-INPUT_PATH = Path("data/processed/user_behavior_clean.parquet")
+INPUT_PATH = Path(
+    "data/processed/user_behavior_clean.parquet"
+)
 
-SPLITS = {
-    "train": pd.Timestamp("2025-11-27 23:59:59"),
-    "valid": pd.Timestamp("2025-12-04 23:59:59"),
-    "test": pd.Timestamp("2025-12-11 23:59:59"),
+OBSERVATION_START = pd.Timestamp(
+    "2025-11-18 00:00:00"
+)
+
+SPLIT_DATE_RANGES = {
+    "train": (
+        pd.Timestamp("2025-11-18"),
+        pd.Timestamp("2025-12-07"),
+    ),
+    "valid": (
+        pd.Timestamp("2025-12-08"),
+        pd.Timestamp("2025-12-14"),
+    ),
+    "test": (
+        pd.Timestamp("2025-12-15"),
+        pd.Timestamp("2025-12-17"),
+    ),
 }
 
-OBSERVATION_START = pd.Timestamp("2025-11-18 00:00:00")
 
+def build_one(split_name, prediction_date):
 
-def build_one(split_name, cutoff):
-    print("=" * 70)
-    print("split :", split_name)
-    print("cutoff:", cutoff)
+    cutoff = (
+        prediction_date.normalize()
+        + pd.Timedelta(days=1)
+        - pd.Timedelta(seconds=1)
+    )
+
+    print("=" * 80)
+    print("split           :", split_name)
+    print("prediction_date :", prediction_date.date())
+    print("cutoff          :", cutoff)
 
     df = pd.read_parquet(
         INPUT_PATH,
@@ -37,18 +59,35 @@ def build_one(split_name, cutoff):
     print("input rows:", f"{len(df):,}")
 
     df = df.sort_values(
-        ["user_id", "time", "item_id", "behavior_type"],
+        [
+            "user_id",
+            "time",
+            "item_id",
+            "behavior_type",
+        ],
         kind="mergesort",
     ).reset_index(drop=True)
 
     recent = (
-        df.groupby("user_id", sort=False)["behavior_type"]
-        .agg(lambda s: list(s.tail(10).astype(int)))
-        .rename("sequence_recent_10_behavior_types")
+        df.groupby(
+            "user_id",
+            sort=False,
+        )["behavior_type"]
+        .agg(
+            lambda s: list(
+                s.tail(10).astype(int)
+            )
+        )
+        .rename(
+            "sequence_recent_10_behavior_types"
+        )
     )
 
     gaps = (
-        df.groupby("user_id", sort=False)["time"]
+        df.groupby(
+            "user_id",
+            sort=False,
+        )["time"]
         .apply(
             lambda s: (
                 s.diff()
@@ -59,11 +98,18 @@ def build_one(split_name, cutoff):
             )
         )
         .fillna(0.0)
-        .rename("sequence_avg_behavior_gap_hours")
+        .rename(
+            "sequence_avg_behavior_gap_hours"
+        )
     )
 
     chain_df = df.sort_values(
-        ["user_id", "item_id", "time", "behavior_type"],
+        [
+            "user_id",
+            "item_id",
+            "time",
+            "behavior_type",
+        ],
         kind="mergesort",
     ).reset_index(drop=True)
 
@@ -76,7 +122,10 @@ def build_one(split_name, cutoff):
 
     seen_pv = (
         behavior.eq(1)
-        .groupby(group_keys, sort=False)
+        .groupby(
+            group_keys,
+            sort=False,
+        )
         .cummax()
     )
 
@@ -86,7 +135,10 @@ def build_one(split_name, cutoff):
 
     seen_valid_cart = (
         valid_pv_cart
-        .groupby(group_keys, sort=False)
+        .groupby(
+            group_keys,
+            sort=False,
+        )
         .cummax()
     )
 
@@ -95,10 +147,21 @@ def build_one(split_name, cutoff):
         & seen_valid_cart
     )
 
-    chain_df["sequence_has_pv_cart"] = valid_pv_cart.astype("uint8")
-    chain_df["sequence_has_pv_fav"] = valid_pv_fav.astype("uint8")
-    chain_df["sequence_has_pv_buy"] = valid_pv_buy.astype("uint8")
-    chain_df["sequence_has_pv_cart_buy"] = valid_pv_cart_buy.astype("uint8")
+    chain_df["sequence_has_pv_cart"] = (
+        valid_pv_cart.astype("uint8")
+    )
+
+    chain_df["sequence_has_pv_fav"] = (
+        valid_pv_fav.astype("uint8")
+    )
+
+    chain_df["sequence_has_pv_buy"] = (
+        valid_pv_buy.astype("uint8")
+    )
+
+    chain_df["sequence_has_pv_cart_buy"] = (
+        valid_pv_cart_buy.astype("uint8")
+    )
 
     chain_cols = [
         "sequence_has_pv_cart",
@@ -108,35 +171,78 @@ def build_one(split_name, cutoff):
     ]
 
     user_chain = (
-        chain_df.groupby("user_id", sort=False)[chain_cols]
+        chain_df
+        .groupby(
+            "user_id",
+            sort=False,
+        )[chain_cols]
         .max()
         .astype("uint8")
     )
 
     result = pd.concat(
-        [recent, gaps, user_chain],
+        [
+            recent,
+            gaps,
+            user_chain,
+        ],
         axis=1,
     ).reset_index()
 
-    result["user_id"] = result["user_id"].astype("int64")
-    result["sequence_avg_behavior_gap_hours"] = (
-        result["sequence_avg_behavior_gap_hours"].astype("float64")
+    result["user_id"] = (
+        result["user_id"]
+        .astype("int64")
+    )
+
+    result[
+        "sequence_avg_behavior_gap_hours"
+    ] = (
+        result[
+            "sequence_avg_behavior_gap_hours"
+        ]
+        .astype("float64")
     )
 
     for col in chain_cols:
-        result[col] = result[col].fillna(0).astype("uint8")
+        result[col] = (
+            result[col]
+            .fillna(0)
+            .astype("uint8")
+        )
 
-    result = result.sort_values("user_id").reset_index(drop=True)
+    result = (
+        result
+        .sort_values("user_id")
+        .reset_index(drop=True)
+    )
 
     schema = pa.schema(
         [
             ("user_id", pa.int64()),
-            ("sequence_recent_10_behavior_types", pa.list_(pa.int64())),
-            ("sequence_avg_behavior_gap_hours", pa.float64()),
-            ("sequence_has_pv_cart", pa.uint8()),
-            ("sequence_has_pv_fav", pa.uint8()),
-            ("sequence_has_pv_buy", pa.uint8()),
-            ("sequence_has_pv_cart_buy", pa.uint8()),
+            (
+                "sequence_recent_10_behavior_types",
+                pa.list_(pa.int64()),
+            ),
+            (
+                "sequence_avg_behavior_gap_hours",
+                pa.float64(),
+            ),
+            (
+                "sequence_has_pv_cart",
+                pa.uint8(),
+            ),
+            (
+                "sequence_has_pv_fav",
+                pa.uint8(),
+            ),
+            (
+                "sequence_has_pv_buy",
+                pa.uint8(),
+            ),
+            (
+                "sequence_has_pv_cart_buy",
+                pa.uint8(),
+            ),
         ]
     )
 
@@ -146,11 +252,22 @@ def build_one(split_name, cutoff):
         preserve_index=False,
     )
 
+    date_string = prediction_date.strftime(
+        "%Y-%m-%d"
+    )
+
     output = (
         Path("data/modeling")
         / split_name
+        / "snapshots"
+        / date_string
         / "features"
         / "user_sequence_features.parquet"
+    )
+
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     pq.write_table(
@@ -164,8 +281,21 @@ def build_one(split_name, cutoff):
 
 
 def main():
-    for split_name, cutoff in SPLITS.items():
-        build_one(split_name, cutoff)
+
+    for split_name, (
+        start_date,
+        end_date,
+    ) in SPLIT_DATE_RANGES.items():
+
+        for prediction_date in pd.date_range(
+            start=start_date,
+            end=end_date,
+            freq="D",
+        ):
+            build_one(
+                split_name,
+                prediction_date,
+            )
 
 
 if __name__ == "__main__":

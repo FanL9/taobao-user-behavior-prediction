@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+﻿from datetime import datetime, timedelta
 from pathlib import Path
 
 from src.features.stage3_intermediate_tables import (
@@ -6,60 +6,105 @@ from src.features.stage3_intermediate_tables import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-INPUT_PATH = PROJECT_ROOT / "data" / "processed" / "user_behavior_clean.parquet"
 
-SPLITS = {
-    "train": datetime(2025, 11, 27, 23, 59, 59),
-    "valid": datetime(2025, 12, 4, 23, 59, 59),
-    "test": datetime(2025, 12, 11, 23, 59, 59),
-}
+INPUT_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+    / "user_behavior_clean.parquet"
+)
 
 OBSERVATION_START = datetime(2025, 11, 18, 0, 0, 0)
 
+SPLIT_DATE_RANGES = {
+    "train": (
+        datetime(2025, 11, 18),
+        datetime(2025, 12, 7),
+    ),
+    "valid": (
+        datetime(2025, 12, 8),
+        datetime(2025, 12, 14),
+    ),
+    "test": (
+        datetime(2025, 12, 15),
+        datetime(2025, 12, 17),
+    ),
+}
+
+
+def date_range(start_date, end_date):
+    current = start_date
+
+    while current <= end_date:
+        yield current
+        current += timedelta(days=1)
+
 
 def main():
-    print("=" * 70)
-    print("Stage 3 leakage-safe feature generation")
+    print("=" * 80)
+    print("Stage 3 prediction-date historical feature generation")
     print(f"Input: {INPUT_PATH}")
-    print("=" * 70)
+    print("=" * 80)
 
-    for split_name, cutoff_time in SPLITS.items():
-        output_dir = (
-            PROJECT_ROOT
-            / "data"
-            / "modeling"
-            / split_name
-            / "features"
-        )
+    for split_name, (start_date, end_date) in SPLIT_DATE_RANGES.items():
 
-        output_dir.mkdir(parents=True, exist_ok=True)
+        for prediction_date in date_range(start_date, end_date):
 
-        print()
-        print("=" * 70)
-        print(f"Building split : {split_name}")
-        print(f"Observation    : {OBSERVATION_START}")
-        print(f"Cutoff         : {cutoff_time}")
-        print(f"Output         : {output_dir}")
-        print("=" * 70)
+            cutoff_time = prediction_date.replace(
+                hour=23,
+                minute=59,
+                second=59,
+            )
 
-        result = build_stage3_intermediate_tables(
-            input_path=INPUT_PATH,
-            observation_start=OBSERVATION_START,
-            cutoff_time=cutoff_time,
-            output_directory=output_dir,
-        )
+            date_string = prediction_date.strftime("%Y-%m-%d")
 
-        print(f"Input rows     : {result.input_rows:,}")
-        print(f"Elapsed        : {result.elapsed_seconds:.3f} sec")
+            output_dir = (
+                PROJECT_ROOT
+                / "data"
+                / "modeling"
+                / split_name
+                / "snapshots"
+                / date_string
+                / "features"
+            )
 
-        for name, path in result.output_paths.items():
-            rows = result.output_rows[name]
-            print(f"{name:<20}: {rows:>12,} rows -> {path}")
+            output_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            print()
+            print("=" * 80)
+            print(f"Split           : {split_name}")
+            print(f"Prediction date : {date_string}")
+            print(f"Observation from: {OBSERVATION_START}")
+            print(f"Cutoff          : {cutoff_time}")
+            print(f"Output          : {output_dir}")
+            print("=" * 80)
+
+            result = build_stage3_intermediate_tables(
+                input_path=INPUT_PATH,
+                observation_start=OBSERVATION_START,
+                cutoff_time=cutoff_time,
+                output_directory=output_dir,
+            )
+
+            print(
+                "Input rows       :",
+                f"{result.input_rows:,}",
+            )
+
+            for name, path in result.output_paths.items():
+                print(
+                    f"{name:<20}: "
+                    f"{result.output_rows[name]:>12,} "
+                    f"rows -> {path}"
+                )
 
     print()
-    print("=" * 70)
-    print("All Stage 3 intermediate feature tables completed.")
-    print("=" * 70)
+    print("=" * 80)
+    print("All prediction-date historical features completed.")
+    print("=" * 80)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import json
 import math
 
@@ -46,7 +46,7 @@ def parse_sequence(value, length=10):
 
 
 def transform_batch(df, config):
-    keys = df[["user_id", "item_id"]].copy()
+    keys = df[config["key_columns"]].copy()
     label = df["label"].astype("uint8").copy()
 
     drop_columns = set(
@@ -276,7 +276,7 @@ def main():
     feature_columns = [
         c
         for c in reference
-        if c not in {"user_id", "item_id", "label"}
+        if c not in set(config["key_columns"]) | {"label"}
     ]
 
     feature_list_path = Path(

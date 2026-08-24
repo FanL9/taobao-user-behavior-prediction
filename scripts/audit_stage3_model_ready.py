@@ -42,7 +42,7 @@ def audit_split(split, expected_features):
     columns = schema.names
 
     expected_columns = (
-        ["user_id", "item_id"]
+        ["user_id", "item_id", "prediction_date"]
         + expected_features
         + ["label"]
     )
@@ -55,7 +55,7 @@ def audit_split(split, expected_features):
 
     feature_columns = [
         c for c in columns
-        if c not in {"user_id", "item_id", "label"}
+        if c not in {"user_id", "item_id", "prediction_date", "label"}
     ]
 
     total_rows = 0
@@ -136,7 +136,7 @@ def audit_split(split, expected_features):
                 )
 
         key_parts.append(
-            df[["user_id", "item_id"]]
+            df[["user_id", "item_id", "prediction_date"]]
         )
 
         print(
@@ -151,7 +151,7 @@ def audit_split(split, expected_features):
 
     duplicate_key_count = int(
         keys.duplicated(
-            ["user_id", "item_id"]
+            ["user_id", "item_id", "prediction_date"]
         ).sum()
     )
 
@@ -323,7 +323,7 @@ def main():
     md.append(
         "- Prediction target: "
         "historically interacted user-item pair "
-        "purchases the item within the next 7 days"
+        "purchases the item on the next calendar day"
     )
     md.append(
         "- Raw identifier and future-window metadata "
@@ -367,11 +367,11 @@ def main():
         "at or before each split cutoff."
     )
     md.append(
-        "- Future 7-day label-window timestamps are "
+        "- Next-day label-window timestamps are "
         "not model features."
     )
     md.append(
-        "- `user_id` and `item_id` are retained only "
+        "- `user_id`, `item_id`, and `prediction_date` are retained only "
         "as sample keys."
     )
     md.append(

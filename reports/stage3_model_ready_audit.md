@@ -4,20 +4,20 @@ Overall status: **PASS**
 
 - Model feature count: 104
 - Train/valid/test schema consistent: True
-- Prediction target: historically interacted user-item pair purchases the item within the next 7 days
+- Prediction target: historically interacted user-item pair purchases the item on the next calendar day
 - Raw identifier and future-window metadata are excluded from model features.
 
 | Split | Rows | Positive | Negative | Positive Rate | Duplicate Keys | Null/NaN/Inf | Status |
 |---|---:|---:|---:|---:|---:|---:|---|
-| train | 1,459,489 | 2,924 | 1,456,565 | 0.200344% | 0 | 0 | PASS |
-| valid | 2,507,302 | 3,243 | 2,504,059 | 0.129342% | 0 | 0 | PASS |
-| test | 3,574,665 | 9,315 | 3,565,350 | 0.260584% | 0 | 0 | PASS |
+| train | 30,790,020 | 16,750 | 30,773,270 | 0.054401% | 0 | 0 | PASS |
+| valid | 25,172,885 | 12,444 | 25,160,441 | 0.049434% | 0 | 0 | PASS |
+| test | 13,207,000 | 3,128 | 13,203,872 | 0.023684% | 0 | 0 | PASS |
 
 ## Leakage controls
 
 - Features are calculated only from behavior at or before each split cutoff.
-- Future 7-day label-window timestamps are not model features.
-- `user_id` and `item_id` are retained only as sample keys.
+- Next-day label-window timestamps are not model features.
+- `user_id`, `item_id`, and `prediction_date` are retained only as sample keys.
 - Raw `category_id` is excluded from the traditional-model feature matrix.
 - Raw datetime fields are excluded; engineered historical time features remain.
 

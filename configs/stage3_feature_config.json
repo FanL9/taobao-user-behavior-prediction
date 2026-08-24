@@ -1,11 +1,12 @@
 ﻿{
-  "version": "stage3_v1",
+  "version": "stage3_v2_one_day",
 
   "target_column": "label",
 
   "key_columns": [
     "user_id",
-    "item_id"
+    "item_id",
+    "prediction_date"
   ],
 
   "metadata_columns": [
@@ -37,10 +38,11 @@
   "sequence_behavior_values": [1, 2, 3, 4],
 
   "notes": {
-    "1": "user_id and item_id remain sample identifiers and are not model features",
-    "2": "category_id is excluded as a raw integer identifier; category aggregate features remain",
-    "3": "raw datetime columns are excluded because engineered recency/hour/span features already exist",
-    "4": "categorical fields use fixed one-hot encoding",
-    "5": "recent behavior sequence is converted into position features and behavior counts"
+    "1": "user_id, item_id and prediction_date define the sample key and are not model features",
+    "2": "the prediction target is whether the user purchases the item on the next calendar day",
+    "3": "category_id is excluded as a raw integer identifier; category aggregate features remain",
+    "4": "raw datetime columns are excluded because engineered recency/hour/span features already exist",
+    "5": "categorical fields use fixed one-hot encoding",
+    "6": "recent behavior sequence is converted into position features and behavior counts"
   }
 }
