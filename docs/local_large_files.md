@@ -36,3 +36,31 @@
 ```
 
 中间表构建命令会重新生成用户、商品、类目、时间以及仅保存在本地的用户—商品交互特征表。Member 2 特征构建命令会重新生成正式的用户序列特征表。被 `.gitignore` 忽略的文件应继续保留在本地，不要使用 `git add -f` 强制添加。
+
+## 阶段三本地建模文件
+
+第三阶段建模过程中生成的大规模样本、标签、特征表和最终入模数据继续保留在本地，不上传 GitHub。相关文件可通过阶段三脚本重新生成。
+
+| 本地文件                                            | 说明            |
+| ----------------------------------------------- | ------------- |
+| `data/modeling/train/train_modeling.parquet`    | 训练集建模样本       |
+| `data/modeling/valid/valid_modeling.parquet`    | 验证集建模样本       |
+| `data/modeling/test/test_modeling.parquet`      | 测试集建模样本       |
+| `data/modeling/train/train_model_ready.parquet` | 训练集最终入模数据     |
+| `data/modeling/valid/valid_model_ready.parquet` | 验证集最终入模数据     |
+| `data/modeling/test/test_model_ready.parquet`   | 测试集最终入模数据     |
+| `data/modeling/train_labels.parquet`            | 训练集未来 7 天购买标签 |
+| `data/modeling/valid_labels.parquet`            | 验证集未来 7 天购买标签 |
+| `data/modeling/test_labels.parquet`             | 测试集未来 7 天购买标签 |
+
+阶段三本地生成顺序：
+
+```text
+python scripts/build_stage3_labels.py
+→ python scripts/build_stage3_intermediate_features.py
+→ python scripts/build_stage3_sequence_features.py
+→ python scripts/build_stage3_model_ready.py
+→ python scripts/audit_stage3_model_ready.py
+```
+
+最终模型特征清单保存在 `configs/stage3_model_feature_list.txt`，审计结果保存在 `reports/stage3_model_ready_audit.json` 和 `reports/stage3_model_ready_audit.md`。大规模 Parquet 文件均由 `.gitignore` 排除，不上传 GitHub。
