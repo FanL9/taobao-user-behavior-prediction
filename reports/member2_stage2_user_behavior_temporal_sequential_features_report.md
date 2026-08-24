@@ -143,11 +143,12 @@
 
 | user_id | recent_5_actions  | avg_recent_5_interval_min | pv_to_fav_count | pv_to_cart_count | pv_to_buy_count | has_behavior_chain |
 | ------- | ----------------- | ------------------------- | --------------- | ---------------- | --------------- | ------------------ |
-| 4913    | pv|pv|pv|pv|pv    | 135                       | 35              | 26               | 5               | 0                  |
-| 6118    | pv|pv|pv|fav|pv   | 15                        | 4               | 0                | 0               | 0                  |
-| 7528    | cart|pv|buy|pv|pv | 285                       | 0               | 19               | 5               | 1                  |
-| 7591    | pv|pv|pv|pv|pv    | 30                        | 0               | 10               | 15              | 1                  |
-| 12645   | pv|pv|pv|pv|pv    | 0                         | 0               | 6                | 7               | 0                  |
+| 4913    | pv\|pv\|pv\|pv\|pv    | 135                       | 35              | 26               | 5               | 0                  |
+| 6118    | pv\|pv\|pv\|fav\|pv   | 15                        | 4               | 0                | 0               | 0                  |
+| 7528    | cart\|pv\|buy\|pv\|pv | 285                       | 0               | 19               | 5               | 1                  |
+| 7591    | pv\|pv\|pv\|pv\|pv    | 30                        | 0               | 10               | 15              | 1                  |
+| 12645   | pv\|pv\|pv\|pv\|pv    | 0                         | 0               | 6                | 7               | 0                  |
+
 
 
 
