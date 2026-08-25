@@ -1,15 +1,97 @@
-# 阶段三最终入模数据审计
+# Stage 3 Model-Ready Data Audit
 
-**当前状态：INVALIDATED（已失效）**
+Overall status: **PASS**
 
-原 `PASS` 结果基于旧版“日期范围内逐日滚动生成样本”口径，不符合当前固定切分，因此不得继续引用旧样本量、正样本数和审计结论。
+- Prediction target: purchase on the next calendar day
+- Preprocessor and selector fitted on train only: True
+- Train/valid/test schema consistent: True
+- Model feature count: 79
+- Tracking columns are retained but excluded from X: `user_id`, `item_id`, `category_id`, `prediction_date`
 
-当前权威切分为：
+| Split | Rows | Positive Rate | Label Window | Status |
+|---|---:|---:|---|---|
+| train | 2,944,576 | 0.030395% | PASS | PASS |
+| valid | 1,110,131 | 0.079810% | PASS | PASS |
+| test | 329,938 | 0.186702% | PASS | PASS |
 
-| 数据集 | 特征 / 预测基准日 | 标签窗口 |
-| --- | --- | --- |
-| 训练集 | `2025-11-18`—`2025-12-07` | `2025-12-08` |
-| 验证集 | `2025-12-09`—`2025-12-14` | `2025-12-15` |
-| 测试集 | `2025-12-16`—`2025-12-17` | `2025-12-18` |
+## Selected features
 
-必须按新口径重新生成全部 `data/modeling/` 本地文件，再运行 `python scripts/audit_stage3_model_ready.py` 刷新本报告。
+- `ui_pv_count`
+- `ui_fav_count`
+- `ui_cart_count`
+- `ui_buy_count`
+- `ui_last_interaction_hour`
+- `ui_has_bought`
+- `user_fav_count`
+- `user_cart_count`
+- `user_buy_count`
+- `user_unique_item_count`
+- `user_unique_category_count`
+- `user_active_day_count`
+- `user_avg_daily_behavior_count`
+- `user_behavior_span_hours`
+- `user_recency_hours`
+- `user_fav_to_pv_rate`
+- `user_cart_to_pv_rate`
+- `user_buy_to_pv_rate`
+- `user_is_buyer`
+- `user_is_repeat_buyer`
+- `sequence_avg_behavior_gap_hours`
+- `sequence_has_pv_cart`
+- `sequence_has_pv_fav`
+- `sequence_has_pv_buy`
+- `sequence_has_pv_cart_buy`
+- `item_pv_count`
+- `item_fav_count`
+- `item_cart_count`
+- `item_buy_count`
+- `item_unique_user_count`
+- `item_unique_buyer_count`
+- `item_active_day_count`
+- `item_fav_to_pv_rate`
+- `item_cart_to_pv_rate`
+- `item_buy_to_pv_rate`
+- `category_fav_count`
+- `category_cart_count`
+- `category_buy_count`
+- `category_unique_user_count`
+- `category_unique_buyer_count`
+- `category_fav_to_pv_rate`
+- `category_cart_to_pv_rate`
+- `category_buy_to_pv_rate`
+- `is_weekend`
+- `time_pv_count`
+- `time_fav_count`
+- `time_cart_count`
+- `time_buy_count`
+- `time_unique_user_count`
+- `time_buy_to_pv_rate`
+- `conversion_fav_to_buy_rate`
+- `conversion_cart_to_buy_rate`
+- `conversion_has_full_funnel`
+- `time_period__afternoon`
+- `time_period__evening`
+- `time_period__morning`
+- `time_period__night`
+- `weekday__0`
+- `weekday__1`
+- `weekday__2`
+- `weekday__3`
+- `weekday__4`
+- `weekday__5`
+- `weekday__6`
+- `seq_pos_1`
+- `seq_pos_2`
+- `seq_pos_3`
+- `seq_pos_4`
+- `seq_pos_5`
+- `seq_pos_6`
+- `seq_pos_7`
+- `seq_pos_8`
+- `seq_pos_9`
+- `seq_pos_10`
+- `seq_count_behavior_1`
+- `seq_count_behavior_2`
+- `seq_count_behavior_3`
+- `seq_count_behavior_4`
+- `seq_distinct_behavior_count`

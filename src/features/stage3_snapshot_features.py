@@ -8,7 +8,7 @@ from src.features.stage3_intermediate_tables import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INPUT_PATH = (
     PROJECT_ROOT / "data" / "processed" / "user_behavior_clean.parquet"
 )

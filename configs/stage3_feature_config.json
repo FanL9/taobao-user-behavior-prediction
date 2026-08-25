@@ -1,20 +1,16 @@
-﻿{
+{
   "version": "stage3_v2_one_day",
-
   "target_column": "label",
-
   "key_columns": [
     "user_id",
     "item_id",
     "prediction_date"
   ],
-
   "metadata_columns": [
     "cutoff_time",
     "label_start",
     "label_end"
   ],
-
   "exclude_raw_columns": [
     "category_id",
     "ui_last_interaction_time",
@@ -22,7 +18,6 @@
     "user_first_behavior_time",
     "user_last_behavior_time"
   ],
-
   "categorical_columns": [
     "user_activity_level",
     "item_popularity_level",
@@ -30,13 +25,14 @@
     "time_period",
     "weekday"
   ],
-
   "sequence_column": "sequence_recent_10_behavior_types",
-
   "sequence_length": 10,
-
-  "sequence_behavior_values": [1, 2, 3, 4],
-
+  "sequence_behavior_values": [
+    1,
+    2,
+    3,
+    4
+  ],
   "notes": {
     "1": "user_id, item_id and prediction_date define the sample key and are not model features",
     "2": "the prediction target is whether the user purchases the item on the next calendar day",
@@ -44,5 +40,125 @@
     "4": "raw datetime columns are excluded because engineered recency/hour/span features already exist",
     "5": "categorical fields use fixed one-hot encoding",
     "6": "recent behavior sequence is converted into position features and behavior counts"
-  }
+  },
+  "tracking_columns": [
+    "user_id",
+    "item_id",
+    "category_id",
+    "prediction_date"
+  ],
+  "forbidden_feature_columns": [
+    "user_id",
+    "item_id",
+    "category_id",
+    "prediction_date",
+    "label",
+    "cutoff_time",
+    "label_start",
+    "label_end",
+    "ui_last_interaction_time",
+    "ui_last_interaction_date",
+    "user_first_behavior_time",
+    "user_last_behavior_time",
+    "user_activity_level",
+    "item_popularity_level",
+    "category_popularity_level",
+    "time_is_peak_hour"
+  ],
+  "leakage_name_patterns": [
+    "(?i)(?:^|_)(?:label|target)(?:_|$)",
+    "(?i)(?:^|_)label_window(?:_|$)",
+    "(?i)(?:^|_)future(?:_|$)",
+    "(?i)^next_day_.*(?:label|target|purchase|buy)",
+    "(?i)^(?:label|target)_.*(?:next_day|future)"
+  ],
+  "preprocessing": {
+    "missing": {
+      "count_name_patterns": [
+        "(?:^|_)count(?:_|$)"
+      ],
+      "count_fill_value": 0.0,
+      "numeric_strategy": "median",
+      "categorical_fill_value": "__UNKNOWN__"
+    },
+    "outlier": {
+      "strategy": "disabled",
+      "lower_quantile": 0.01,
+      "upper_quantile": 0.99,
+      "exclude_binary": true
+    },
+    "categorical": {
+      "strategy": "one_hot",
+      "handle_unknown": "explicit_unknown",
+      "unknown_value": "__UNKNOWN__"
+    },
+    "sequence": {
+      "position_encoding": "numeric",
+      "future_position_one_hot_supported": false
+    },
+    "scaling": {
+      "default_profile": "tree",
+      "profiles": {
+        "tree": {
+          "strategy": "none"
+        },
+        "linear": {
+          "strategy": "standard",
+          "exclude_binary": true,
+          "include_sequence_numeric": false
+        }
+      }
+    },
+    "fit_sampling": {
+      "strategy": "deterministic_hash_top_k",
+      "max_rows": 200000,
+      "batch_size": 200000
+    }
+  },
+  "feature_selection": {
+    "high_missing": {
+      "enabled": true,
+      "threshold": 0.95
+    },
+    "low_variance": {
+      "enabled": true,
+      "continuous_variance_threshold": 0.0,
+      "binary_max_dominant_frequency": 0.9999
+    },
+    "high_correlation": {
+      "enabled": true,
+      "method": "pearson",
+      "threshold": 0.98,
+      "include_binary": false,
+      "whitelist": [],
+      "preferred_feature_prefixes": [
+        "item_",
+        "user_",
+        "category_",
+        "time_",
+        "ui_",
+        "sequence_",
+        "seq_",
+        "conversion_"
+      ]
+    }
+  },
+  "label_definition": {
+    "prediction_date_role": "target_calendar_day",
+    "feature_cutoff": "prediction_date - 1 second",
+    "positive_label": "the user purchases the item on prediction_date",
+    "label_start_offset_days": 0,
+    "label_end_offset_days": 1,
+    "label_window": "[prediction_date 00:00:00, prediction_date + 1 day 00:00:00)"
+  },
+  "sample_key_columns": [
+    "user_id",
+    "item_id",
+    "prediction_date"
+  ],
+  "sequence_columns": [
+    "sequence_recent_10_behavior_types"
+  ],
+  "random_seed": 20260825,
+  "fit_split": "train"
 }

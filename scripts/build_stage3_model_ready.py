@@ -1,297 +1,332 @@
-from pathlib import Path
-import json
-import math
+"""Fit Stage 3 preprocessing on train and transform all splits in batches."""
 
+from __future__ import annotations
+
+import json
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import joblib
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from src.features.stage3_feature_selection import Stage3FeatureSelector
+from src.features.stage3_preprocessing import Stage3Preprocessor
 
-ROOT = Path("data/modeling")
-CONFIG_PATH = Path("configs/stage3_feature_config.json")
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT / "data" / "modeling"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "stage3_feature_config.json"
+FEATURE_LIST_PATH = PROJECT_ROOT / "configs" / "stage3_model_feature_list.txt"
+ARTIFACT_PATH = (
+    PROJECT_ROOT / "artifacts" / "preprocessors" / "stage3_preprocessor.joblib"
+)
+SELECTION_REPORT_PATH = (
+    PROJECT_ROOT / "reports" / "stage3_feature_selection_report.json"
+)
 SPLITS = ("train", "valid", "test")
 
-CATEGORY_LEVELS = {
-    "user_activity_level": ["low", "high"],
-    "item_popularity_level": ["low", "medium", "high"],
-    "category_popularity_level": ["long_tail", "medium", "popular"],
-    "time_period": ["morning", "afternoon", "evening", "night"],
-    "weekday": [0, 1, 2, 3, 4, 5, 6],
-}
 
-BATCH_SIZE = 200_000
+def load_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
-def parse_sequence(value, length=10):
-    if value is None or pd.isna(value):
-        return [0] * length
-
-    parts = str(value).split("|")
-
-    seq = []
-    for x in parts:
-        x = x.strip()
-
-        if x in {"1", "2", "3", "4"}:
-            seq.append(int(x))
-
-    seq = seq[-length:]
-
-    if len(seq) < length:
-        seq = [0] * (length - len(seq)) + seq
-
-    return seq
+def modeling_path(split: str) -> Path:
+    return ROOT / split / f"{split}_modeling.parquet"
 
 
-def transform_batch(df, config):
-    keys = df[config["key_columns"]].copy()
-    label = df["label"].astype("uint8").copy()
+def model_ready_path(split: str) -> Path:
+    return ROOT / split / f"{split}_model_ready.parquet"
 
-    drop_columns = set(
-        config["key_columns"]
-        + config["metadata_columns"]
-        + config["exclude_raw_columns"]
-        + config["categorical_columns"]
-        + [
-            config["target_column"],
-            config["sequence_column"],
-        ]
-    )
 
-    feature_columns = [
-        c for c in df.columns
-        if c not in drop_columns
-    ]
+def deterministic_train_sample(
+    path: Path,
+    config: dict[str, Any],
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Keep the rows with the smallest seeded key hashes across all batches."""
 
-    X = df[feature_columns].copy()
+    sampling = config["preprocessing"]["fit_sampling"]
+    strategy = str(sampling["strategy"])
+    if strategy != "deterministic_hash_top_k":
+        raise ValueError(f"Unsupported fit sampling strategy: {strategy}")
 
-    # -------------------------------------------------
-    # Categorical one-hot encoding with fixed categories
-    # -------------------------------------------------
-    for col, levels in CATEGORY_LEVELS.items():
-        for level in levels:
-            out_col = f"{col}__{level}"
+    max_rows = int(sampling["max_rows"])
+    batch_size = int(sampling["batch_size"])
+    seed = int(config["random_seed"])
+    key_columns = list(config["sample_key_columns"])
+    if max_rows <= 0 or batch_size <= 0:
+        raise ValueError("Fit sampling max_rows and batch_size must be positive")
 
-            if isinstance(level, int):
-                X[out_col] = (
-                    pd.to_numeric(df[col], errors="coerce")
-                    .eq(level)
-                    .astype("uint8")
-                )
-            else:
-                X[out_col] = (
-                    df[col]
-                    .astype(str)
-                    .eq(str(level))
-                    .astype("uint8")
-                )
+    parquet = pq.ParquetFile(path)
+    schema_columns = set(parquet.schema_arrow.names)
+    missing_keys = [column for column in key_columns if column not in schema_columns]
+    if missing_keys:
+        raise ValueError(f"Train Parquet is missing sampling keys: {missing_keys}")
 
-    # -------------------------------------------------
-    # Recent behavior sequence
-    # -------------------------------------------------
-    sequences = df[config["sequence_column"]].map(
-        lambda x: parse_sequence(
-            x,
-            config["sequence_length"],
-        )
-    )
+    sample = pd.DataFrame()
+    hash_column = "__stage3_fit_hash__"
+    seed_mask = np.uint64(seed)
 
-    seq_matrix = np.asarray(
-        sequences.tolist(),
-        dtype=np.uint8,
-    )
-
-    for i in range(config["sequence_length"]):
-        X[f"seq_pos_{i + 1}"] = seq_matrix[:, i]
-
-    for behavior in config["sequence_behavior_values"]:
-        X[f"seq_count_behavior_{behavior}"] = (
-            seq_matrix == behavior
-        ).sum(axis=1).astype("uint8")
-
-    X["seq_distinct_behavior_count"] = np.array(
-        [
-            len(set(row[row > 0]))
-            for row in seq_matrix
-        ],
-        dtype=np.uint8,
-    )
-
-    # -------------------------------------------------
-    # Cyclical hour transformation
-    # -------------------------------------------------
-    if "ui_last_interaction_hour" in X.columns:
-        hour = pd.to_numeric(
-            X["ui_last_interaction_hour"],
-            errors="coerce",
-        ).fillna(0)
-
-        X["ui_last_interaction_hour_sin"] = np.sin(
-            2 * math.pi * hour / 24.0
+    for batch_number, batch in enumerate(
+        parquet.iter_batches(batch_size=batch_size, use_threads=True),
+        start=1,
+    ):
+        frame = batch.to_pandas()
+        hashes = pd.util.hash_pandas_object(
+            frame[key_columns],
+            index=False,
+        ).astype("uint64")
+        frame[hash_column] = hashes ^ seed_mask
+        candidate = frame.nsmallest(min(max_rows, len(frame)), hash_column)
+        if sample.empty:
+            sample = candidate
+        else:
+            sample = pd.concat([sample, candidate], ignore_index=True).nsmallest(
+                max_rows,
+                hash_column,
+            )
+        print(
+            f"fit sample batch {batch_number:03d} "
+            f"| retained={len(sample):,}"
         )
 
-        X["ui_last_interaction_hour_cos"] = np.cos(
-            2 * math.pi * hour / 24.0
-        )
+    if sample.empty:
+        raise RuntimeError("Training input is empty")
+    sample = sample.sort_values(hash_column).drop(columns=[hash_column])
+    sample = sample.reset_index(drop=True)
+    metadata = {
+        "strategy": strategy,
+        "sample_size": int(len(sample)),
+        "max_rows": max_rows,
+        "seed": seed,
+        "source_rows": int(parquet.metadata.num_rows),
+        "source_path": str(path),
+    }
+    return sample, metadata
 
-        X = X.drop(columns=["ui_last_interaction_hour"])
 
-    # -------------------------------------------------
-    # Make sure all model features are numeric
-    # -------------------------------------------------
-    bad = [
-        col
-        for col in X.columns
-        if not pd.api.types.is_numeric_dtype(X[col])
-    ]
+def fit_model_ready_pipeline(
+    train_df: pd.DataFrame,
+    config: dict[str, Any],
+    *,
+    scaling_profile: str | None = None,
+    fit_metadata: dict[str, Any] | None = None,
+) -> tuple[Stage3Preprocessor, Stage3FeatureSelector]:
+    """Fit both stages once; this function never accepts valid/test as fit data."""
 
-    if bad:
-        raise RuntimeError(
-            f"Non-numeric model features remain: {bad}"
-        )
+    preprocessor = Stage3Preprocessor(
+        config,
+        scaling_profile=scaling_profile,
+    )
+    preprocessor.fit(
+        train_df,
+        split_name=config["fit_split"],
+        fit_metadata=fit_metadata,
+    )
+    # Feature selection sees unscaled values so low-variance thresholds retain
+    # their configured meaning even when the output profile is linear.
+    train_transformed = preprocessor.transform(train_df, apply_scaling=False)
+    selector = Stage3FeatureSelector(config)
+    selector.fit(
+        train_transformed.X,
+        raw_missing_rates=preprocessor.get_output_missing_rates(),
+        split_name=config["fit_split"],
+    )
+    return preprocessor, selector
 
+
+def transform_model_ready_frame(
+    df: pd.DataFrame,
+    preprocessor: Stage3Preprocessor,
+    selector: Stage3FeatureSelector,
+) -> pd.DataFrame:
+    transformed = preprocessor.transform(df)
+    selected = selector.transform(transformed.X)
+    if transformed.y is None:
+        raise ValueError("Current Stage 3 model-ready outputs require label")
     result = pd.concat(
         [
-            keys.reset_index(drop=True),
-            X.reset_index(drop=True),
-            label.rename("label").reset_index(drop=True),
+            transformed.tracking_df.reset_index(drop=True),
+            selected.reset_index(drop=True),
+            transformed.y.reset_index(drop=True),
         ],
         axis=1,
     )
-
     return result
 
 
-def process_split(split, config):
-    input_path = (
-        ROOT
-        / split
-        / f"{split}_modeling.parquet"
+def write_model_ready_split(
+    split: str,
+    preprocessor: Stage3Preprocessor,
+    selector: Stage3FeatureSelector,
+    *,
+    batch_size: int,
+) -> pa.Schema:
+    input_path = modeling_path(split)
+    output_path = model_ready_path(split)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    parquet = pq.ParquetFile(input_path)
+
+    handle = tempfile.NamedTemporaryFile(
+        prefix=f".{output_path.stem}.",
+        suffix=".parquet.tmp",
+        dir=output_path.parent,
+        delete=False,
     )
-
-    output_path = (
-        ROOT
-        / split
-        / f"{split}_model_ready.parquet"
-    )
-
-    pf = pq.ParquetFile(input_path)
-
-    writer = None
+    handle.close()
+    temporary = Path(handle.name)
+    writer: pq.ParquetWriter | None = None
+    expected_schema: pa.Schema | None = None
     total_rows = 0
-    expected_columns = None
-
-    print("=" * 80)
-    print("Processing:", split)
-    print("Input     :", input_path)
 
     try:
-        for batch_no, batch in enumerate(
-            pf.iter_batches(batch_size=BATCH_SIZE),
+        for batch_number, batch in enumerate(
+            parquet.iter_batches(batch_size=batch_size, use_threads=True),
             start=1,
         ):
-            df = batch.to_pandas()
-
-            transformed = transform_batch(
-                df,
-                config,
+            frame = batch.to_pandas()
+            transformed = transform_model_ready_frame(
+                frame,
+                preprocessor,
+                selector,
             )
-
-            if expected_columns is None:
-                expected_columns = transformed.columns.tolist()
-            elif transformed.columns.tolist() != expected_columns:
-                raise RuntimeError(
-                    f"{split}: inconsistent columns between batches"
-                )
-
-            table = pa.Table.from_pandas(
-                transformed,
-                preserve_index=False,
-            )
-
-            if writer is None:
+            table = pa.Table.from_pandas(transformed, preserve_index=False)
+            if expected_schema is None:
+                expected_schema = table.schema
                 writer = pq.ParquetWriter(
-                    output_path,
-                    table.schema,
+                    temporary,
+                    expected_schema,
                     compression="snappy",
                     use_dictionary=True,
                 )
-
-            writer.write_table(
-                table,
-                row_group_size=100_000,
-            )
-
+            elif not table.schema.equals(expected_schema):
+                raise RuntimeError(f"{split}: schema changed between batches")
+            if writer is None:
+                raise RuntimeError("Parquet writer was not initialized")
+            writer.write_table(table, row_group_size=100_000)
             total_rows += len(transformed)
-
             print(
-                f"batch {batch_no:02d} | "
-                f"rows processed = {total_rows:,}"
+                f"{split} batch {batch_number:03d} "
+                f"| rows={total_rows:,}"
             )
 
-    finally:
         if writer is not None:
             writer.close()
+            writer = None
+        if expected_schema is None:
+            raise RuntimeError(f"{split}: no rows were transformed")
+        written = pq.ParquetFile(temporary)
+        try:
+            if written.metadata.num_rows != parquet.metadata.num_rows:
+                raise RuntimeError(f"{split}: output row count does not match input")
+        finally:
+            written.close()
 
-    print("Output    :", output_path)
-    print("Rows      :", f"{total_rows:,}")
-    print("Columns   :", len(expected_columns))
+        temporary.replace(output_path)
+        print(f"{split} saved: {output_path}")
+        return expected_schema
+    except Exception:
+        if writer is not None:
+            writer.close()
+        temporary.unlink(missing_ok=True)
+        raise
 
-    return expected_columns
 
-
-def main():
-    config = json.loads(
-        CONFIG_PATH.read_text(
-            encoding="utf-8-sig"
-        )
+def _write_artifact(
+    preprocessor: Stage3Preprocessor,
+    selector: Stage3FeatureSelector,
+    config: dict[str, Any],
+) -> None:
+    ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    handle = tempfile.NamedTemporaryFile(
+        prefix=f".{ARTIFACT_PATH.stem}.",
+        suffix=".joblib.tmp",
+        dir=ARTIFACT_PATH.parent,
+        delete=False,
     )
-
-    schemas = {}
-
-    for split in SPLITS:
-        schemas[split] = process_split(
-            split,
-            config,
+    handle.close()
+    temporary = Path(handle.name)
+    try:
+        joblib.dump(
+            {
+                "config": config,
+                "preprocessor": preprocessor,
+                "selector": selector,
+                "preprocessor_state": preprocessor.get_state(),
+                "selector_state": selector.get_state(),
+            },
+            temporary,
         )
+        temporary.replace(ARTIFACT_PATH)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
-    reference = schemas["train"]
 
-    print()
-    print("=" * 80)
-    print("FINAL SCHEMA CHECK")
-    print("=" * 80)
-
-    for split in SPLITS:
-        same = schemas[split] == reference
-        print(split, "same columns =", same)
-
-        if not same:
-            raise RuntimeError(
-                f"{split}: model-ready schema mismatch"
-            )
-
-    feature_columns = [
-        c
-        for c in reference
-        if c not in set(config["key_columns"]) | {"label"}
-    ]
-
-    feature_list_path = Path(
-        "configs/stage3_model_feature_list.txt"
+def _write_manifests(selector: Stage3FeatureSelector) -> None:
+    selected = selector.get_selected_features()
+    FEATURE_LIST_PATH.write_text(
+        "\n".join(selected) + "\n",
+        encoding="utf-8",
     )
-
-    feature_list_path.write_text(
-        "\n".join(feature_columns) + "\n",
+    SELECTION_REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SELECTION_REPORT_PATH.write_text(
+        json.dumps(
+            {
+                "fit_split": selector.fit_split,
+                "selected_feature_count": len(selected),
+                "selected_features": selected,
+                "drop_records": selector.get_drop_records(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
-    print()
-    print("Model feature count:", len(feature_columns))
-    print("Feature list saved :", feature_list_path)
-    print("All preprocessing completed successfully.")
+
+def main() -> None:
+    config = load_config()
+    if config.get("fit_split") != "train":
+        raise ValueError("Stage 3 preprocessing fit_split must be train")
+
+    train_sample, sample_metadata = deterministic_train_sample(
+        modeling_path("train"),
+        config,
+    )
+    preprocessor, selector = fit_model_ready_pipeline(
+        train_sample,
+        config,
+        scaling_profile=config["preprocessing"]["scaling"]["default_profile"],
+        fit_metadata=sample_metadata,
+    )
+    del train_sample
+
+    batch_size = int(config["preprocessing"]["fit_sampling"]["batch_size"])
+    schemas: dict[str, pa.Schema] = {}
+    for split in SPLITS:
+        schemas[split] = write_model_ready_split(
+            split,
+            preprocessor,
+            selector,
+            batch_size=batch_size,
+        )
+
+    reference = schemas["train"]
+    inconsistent = [
+        split for split in SPLITS if not schemas[split].equals(reference)
+    ]
+    if inconsistent:
+        raise RuntimeError(
+            "Train/valid/test model-ready schemas differ: "
+            f"{inconsistent}"
+        )
+    _write_artifact(preprocessor, selector, config)
+    _write_manifests(selector)
+    print("Stage 3 train-fitted preprocessing completed successfully.")
 
 
 if __name__ == "__main__":

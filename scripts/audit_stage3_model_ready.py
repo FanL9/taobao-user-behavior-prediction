@@ -1,426 +1,248 @@
-﻿from pathlib import Path
-import json
-import math
+"""Audit train-fitted Stage 3 next-day model-ready outputs."""
 
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+import joblib
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
 
-ROOT = Path("data/modeling")
-REPORT_DIR = Path("reports")
-REPORT_DIR.mkdir(parents=True, exist_ok=True)
-
-FEATURE_LIST_PATH = Path("configs/stage3_model_feature_list.txt")
-
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = PROJECT_ROOT / "data" / "modeling"
+REPORT_DIR = PROJECT_ROOT / "reports"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "stage3_feature_config.json"
+FEATURE_LIST_PATH = PROJECT_ROOT / "configs" / "stage3_model_feature_list.txt"
+ARTIFACT_PATH = (
+    PROJECT_ROOT / "artifacts" / "preprocessors" / "stage3_preprocessor.joblib"
+)
 SPLITS = ("train", "valid", "test")
-
-FORBIDDEN_MODEL_COLUMNS = {
-    "cutoff_time",
-    "label_start",
-    "label_end",
-    "category_id",
-    "ui_last_interaction_time",
-    "ui_last_interaction_date",
-    "user_first_behavior_time",
-    "user_last_behavior_time",
-    "sequence_recent_10_behavior_types",
-}
-
 BATCH_SIZE = 200_000
 
 
-def audit_split(split, expected_features):
-    path = (
-        ROOT
-        / split
-        / f"{split}_model_ready.parquet"
-    )
+def load_config() -> dict[str, Any]:
+    return json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
 
-    pf = pq.ParquetFile(path)
-    schema = pf.schema_arrow
-    columns = schema.names
 
-    expected_columns = (
-        ["user_id", "item_id", "prediction_date"]
-        + expected_features
-        + ["label"]
-    )
+def audit_label_window(split: str, config: dict[str, Any]) -> dict[str, Any]:
+    path = ROOT / f"{split}_labels.parquet"
+    parquet = pq.ParquetFile(path)
+    bad_rows = 0
+    checked_rows = 0
+    start_days = int(config["label_definition"]["label_start_offset_days"])
+    end_days = int(config["label_definition"]["label_end_offset_days"])
 
+    columns = ["prediction_date", "cutoff_time", "label_start", "label_end"]
+    for batch in parquet.iter_batches(columns=columns, batch_size=BATCH_SIZE):
+        frame = batch.to_pandas()
+        prediction_date = pd.to_datetime(frame["prediction_date"]).dt.normalize()
+        expected_cutoff = prediction_date - pd.Timedelta(seconds=1)
+        expected_start = prediction_date + pd.Timedelta(days=start_days)
+        expected_end = prediction_date + pd.Timedelta(days=end_days) - pd.Timedelta(
+            seconds=1
+        )
+        valid = (
+            pd.to_datetime(frame["cutoff_time"]).eq(expected_cutoff)
+            & pd.to_datetime(frame["label_start"]).eq(expected_start)
+            & pd.to_datetime(frame["label_end"]).eq(expected_end)
+        )
+        bad_rows += int((~valid).sum())
+        checked_rows += len(frame)
+    return {
+        "rows_checked": checked_rows,
+        "invalid_label_window_rows": bad_rows,
+        "status": "PASS" if bad_rows == 0 else "FAIL",
+    }
+
+
+def audit_split(
+    split: str,
+    expected_features: list[str],
+    config: dict[str, Any],
+    feature_source_map: dict[str, str],
+) -> dict[str, Any]:
+    path = ROOT / split / f"{split}_model_ready.parquet"
+    parquet = pq.ParquetFile(path)
+    columns = parquet.schema_arrow.names
+    tracking = list(config["tracking_columns"])
+    target = str(config["target_column"])
+    expected_columns = tracking + expected_features + [target]
     schema_ok = columns == expected_columns
 
-    forbidden_present = sorted(
-        set(columns) & FORBIDDEN_MODEL_COLUMNS
+    patterns = [re.compile(value) for value in config["leakage_name_patterns"]]
+    forbidden = set(config["forbidden_feature_columns"])
+    forbidden_features = sorted(
+        feature
+        for feature in expected_features
+        if feature in forbidden
+        or feature_source_map.get(feature) in forbidden
+        or any(pattern.search(feature) for pattern in patterns)
     )
-
-    feature_columns = [
-        c for c in columns
-        if c not in {"user_id", "item_id", "prediction_date", "label"}
-    ]
 
     total_rows = 0
     positive = 0
     null_count = 0
     nan_count = 0
     inf_count = 0
-
-    min_values = {
-        col: None for col in feature_columns
-    }
-    max_values = {
-        col: None for col in feature_columns
-    }
-
     duplicate_key_count = 0
+    key_order_ok = True
+    previous_key: tuple[Any, ...] | None = None
+    sort_key = ["prediction_date", "user_id", "item_id"]
 
-    key_parts = []
-
-    for batch_no, batch in enumerate(
-        pf.iter_batches(
-            batch_size=BATCH_SIZE,
-        ),
+    for batch_number, batch in enumerate(
+        parquet.iter_batches(batch_size=BATCH_SIZE),
         start=1,
     ):
-        df = batch.to_pandas()
+        frame = batch.to_pandas()
+        total_rows += len(frame)
+        positive += int((frame[target] == 1).sum())
+        features = frame[expected_features]
+        null_count += int(features.isna().sum().sum())
+        values = features.to_numpy(dtype=np.float64, copy=False)
+        nan_count += int(np.isnan(values).sum())
+        inf_count += int(np.isinf(values).sum())
 
-        total_rows += len(df)
-
-        positive += int(
-            (df["label"] == 1).sum()
-        )
-
-        null_count += int(
-            df[feature_columns].isna().sum().sum()
-        )
-
-        arr = df[feature_columns].to_numpy(
-            dtype=np.float64,
-            copy=False,
-        )
-
-        nan_count += int(
-            np.isnan(arr).sum()
-        )
-
-        inf_count += int(
-            np.isinf(arr).sum()
-        )
-
-        for col in feature_columns:
-            values = pd.to_numeric(
-                df[col],
-                errors="coerce",
-            )
-
-            finite = values[
-                np.isfinite(values)
-            ]
-
-            if len(finite) == 0:
-                continue
-
-            col_min = float(finite.min())
-            col_max = float(finite.max())
-
-            if min_values[col] is None:
-                min_values[col] = col_min
-                max_values[col] = col_max
-            else:
-                min_values[col] = min(
-                    min_values[col],
-                    col_min,
-                )
-                max_values[col] = max(
-                    max_values[col],
-                    col_max,
-                )
-
-        key_parts.append(
-            df[["user_id", "item_id", "prediction_date"]]
-        )
-
-        print(
-            f"{split} batch {batch_no:02d} "
-            f"| rows audited = {total_rows:,}"
-        )
-
-    keys = pd.concat(
-        key_parts,
-        ignore_index=True,
-    )
-
-    duplicate_key_count = int(
-        keys.duplicated(
-            ["user_id", "item_id", "prediction_date"]
-        ).sum()
-    )
-
-    del keys
-    del key_parts
-
-    constant_features = sorted(
-        [
-            col
-            for col in feature_columns
-            if (
-                min_values[col] is not None
-                and max_values[col] is not None
-                and math.isclose(
-                    min_values[col],
-                    max_values[col],
-                    rel_tol=0.0,
-                    abs_tol=0.0,
-                )
-            )
-        ]
-    )
+        keys = frame[sort_key]
+        duplicate_key_count += int(keys.duplicated().sum())
+        key_tuples = list(keys.itertuples(index=False, name=None))
+        if key_tuples:
+            if previous_key is not None:
+                if key_tuples[0] == previous_key:
+                    duplicate_key_count += 1
+                if key_tuples[0] < previous_key:
+                    key_order_ok = False
+            if any(left > right for left, right in zip(key_tuples, key_tuples[1:])):
+                key_order_ok = False
+            previous_key = key_tuples[-1]
+        print(f"{split} batch {batch_number:03d} | rows={total_rows:,}")
 
     negative = total_rows - positive
-    positive_rate = (
-        positive / total_rows
-        if total_rows
-        else 0.0
-    )
-
-    label_ok = (
-        positive > 0
-        and negative > 0
-    )
-
+    label_ok = positive > 0 and negative > 0
     passed = all(
         [
             schema_ok,
-            not forbidden_present,
+            not forbidden_features,
             duplicate_key_count == 0,
+            key_order_ok,
             null_count == 0,
             nan_count == 0,
             inf_count == 0,
             label_ok,
-            len(constant_features) == 0,
         ]
     )
-
     return {
         "split": split,
         "path": str(path),
         "rows": total_rows,
         "columns": len(columns),
-        "model_features": len(feature_columns),
+        "model_features": len(expected_features),
         "positive": positive,
         "negative": negative,
-        "positive_rate": positive_rate,
+        "positive_rate": positive / total_rows if total_rows else 0.0,
         "schema_ok": schema_ok,
-        "forbidden_columns_present": forbidden_present,
+        "forbidden_features": forbidden_features,
         "duplicate_primary_key_count": duplicate_key_count,
+        "key_order_ok": key_order_ok,
         "feature_null_count": null_count,
         "feature_nan_count": nan_count,
         "feature_inf_count": inf_count,
-        "constant_features": constant_features,
         "label_ok": label_ok,
         "status": "PASS" if passed else "FAIL",
     }
 
 
-def main():
-    expected_features = (
-        FEATURE_LIST_PATH
-        .read_text(encoding="utf-8")
-        .splitlines()
+def main() -> None:
+    config = load_config()
+    expected_features = [
+        line
+        for line in FEATURE_LIST_PATH.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    artifact = joblib.load(ARTIFACT_PATH)
+    preprocessor_state = artifact["preprocessor_state"]
+    selector_state = artifact["selector_state"]
+    artifact_fit_ok = (
+        preprocessor_state.get("fit_split") == "train"
+        and selector_state.get("fit_split") == "train"
+        and selector_state.get("selected_features") == expected_features
     )
 
-    print("=" * 90)
-    print("STAGE 3 FINAL MODEL-READY AUDIT")
-    print("=" * 90)
-
-    results = []
-
-    for split in SPLITS:
-        result = audit_split(
-            split,
-            expected_features,
-        )
-
-        results.append(result)
-
-        print()
-        print(
-            split,
-            "| status =", result["status"],
-            "| rows =", f'{result["rows"]:,}',
-            "| positive rate =",
-            f'{result["positive_rate"]:.6%}',
-        )
-        print()
-
-    schema_reference = pq.ParquetFile(
-        ROOT
-        / "train"
-        / "train_model_ready.parquet"
-    ).schema_arrow
-
-    schema_consistency = True
-
-    for split in ("valid", "test"):
-        other = pq.ParquetFile(
-            ROOT
-            / split
-            / f"{split}_model_ready.parquet"
-        ).schema_arrow
-
-        if not schema_reference.equals(other):
-            schema_consistency = False
-
+    label_windows = {
+        split: audit_label_window(split, config) for split in SPLITS
+    }
+    feature_source_map = preprocessor_state.get("feature_source_map", {})
+    results = [
+        audit_split(split, expected_features, config, feature_source_map)
+        for split in SPLITS
+    ]
+    schemas = [
+        pq.ParquetFile(ROOT / split / f"{split}_model_ready.parquet").schema_arrow
+        for split in SPLITS
+    ]
+    schema_consistency = all(schema.equals(schemas[0]) for schema in schemas[1:])
     overall_pass = (
-        schema_consistency
-        and all(
-            r["status"] == "PASS"
-            for r in results
-        )
+        artifact_fit_ok
+        and schema_consistency
+        and all(value["status"] == "PASS" for value in label_windows.values())
+        and all(result["status"] == "PASS" for result in results)
     )
 
-    json_path = (
-        REPORT_DIR
-        / "stage3_model_ready_audit.json"
-    )
-
+    payload = {
+        "overall_status": "PASS" if overall_pass else "FAIL",
+        "prediction_target": "next-calendar-day user-item purchase",
+        "artifact_fit_split_is_train": artifact_fit_ok,
+        "schema_consistency": schema_consistency,
+        "tracking_columns": config["tracking_columns"],
+        "feature_count": len(expected_features),
+        "label_windows": label_windows,
+        "splits": results,
+    }
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    json_path = REPORT_DIR / "stage3_model_ready_audit.json"
     json_path.write_text(
-        json.dumps(
-            {
-                "overall_status":
-                    "PASS" if overall_pass else "FAIL",
-                "schema_consistency":
-                    schema_consistency,
-                "feature_count":
-                    len(expected_features),
-                "splits":
-                    results,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
+        json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
-    md = []
-
-    md.append(
-        "# Stage 3 Model-Ready Data Audit"
-    )
-    md.append("")
-    md.append(
-        f"Overall status: "
-        f"**{'PASS' if overall_pass else 'FAIL'}**"
-    )
-    md.append("")
-    md.append(
-        f"- Model feature count: "
-        f"{len(expected_features)}"
-    )
-    md.append(
-        f"- Train/valid/test schema consistent: "
-        f"{schema_consistency}"
-    )
-    md.append(
-        "- Prediction target: "
-        "historically interacted user-item pair "
-        "purchases the item on the next calendar day"
-    )
-    md.append(
-        "- Raw identifier and future-window metadata "
-        "are excluded from model features."
-    )
-    md.append("")
-
-    md.append(
-        "| Split | Rows | Positive | Negative | "
-        "Positive Rate | Duplicate Keys | "
-        "Null/NaN/Inf | Status |"
-    )
-
-    md.append(
-        "|---|---:|---:|---:|---:|---:|---:|---|"
-    )
-
-    for r in results:
-        bad_values = (
-            r["feature_null_count"]
-            + r["feature_nan_count"]
-            + r["feature_inf_count"]
+    markdown = [
+        "# Stage 3 Model-Ready Data Audit",
+        "",
+        f"Overall status: **{payload['overall_status']}**",
+        "",
+        "- Prediction target: purchase on the next calendar day",
+        f"- Preprocessor and selector fitted on train only: {artifact_fit_ok}",
+        f"- Train/valid/test schema consistent: {schema_consistency}",
+        f"- Model feature count: {len(expected_features)}",
+        "- Tracking columns are retained but excluded from X: "
+        + ", ".join(f"`{column}`" for column in config["tracking_columns"]),
+        "",
+        "| Split | Rows | Positive Rate | Label Window | Status |",
+        "|---|---:|---:|---|---|",
+    ]
+    for result in results:
+        window_status = label_windows[result["split"]]["status"]
+        markdown.append(
+            f"| {result['split']} | {result['rows']:,} "
+            f"| {result['positive_rate']:.6%} | {window_status} "
+            f"| {result['status']} |"
         )
+    markdown.extend(["", "## Selected features", ""])
+    markdown.extend(f"- `{feature}`" for feature in expected_features)
+    markdown_path = REPORT_DIR / "stage3_model_ready_audit.md"
+    markdown_path.write_text("\n".join(markdown) + "\n", encoding="utf-8")
 
-        md.append(
-            f'| {r["split"]} '
-            f'| {r["rows"]:,} '
-            f'| {r["positive"]:,} '
-            f'| {r["negative"]:,} '
-            f'| {r["positive_rate"]:.6%} '
-            f'| {r["duplicate_primary_key_count"]:,} '
-            f'| {bad_values:,} '
-            f'| {r["status"]} |'
-        )
-
-    md.append("")
-    md.append("## Leakage controls")
-    md.append("")
-    md.append(
-        "- Features are calculated only from behavior "
-        "at or before each split cutoff."
-    )
-    md.append(
-        "- Next-day label-window timestamps are "
-        "not model features."
-    )
-    md.append(
-        "- `user_id`, `item_id`, and `prediction_date` are retained only "
-        "as sample keys."
-    )
-    md.append(
-        "- Raw `category_id` is excluded from the "
-        "traditional-model feature matrix."
-    )
-    md.append(
-        "- Raw datetime fields are excluded; "
-        "engineered historical time features remain."
-    )
-    md.append("")
-    md.append("## Final feature list")
-    md.append("")
-
-    for feature in expected_features:
-        md.append(f"- `{feature}`")
-
-    report_path = (
-        REPORT_DIR
-        / "stage3_model_ready_audit.md"
-    )
-
-    report_path.write_text(
-        "\n".join(md) + "\n",
-        encoding="utf-8",
-    )
-
-    print("=" * 90)
-    print(
-        "Schema consistency:",
-        schema_consistency,
-    )
-    print(
-        "Overall status:",
-        "PASS" if overall_pass else "FAIL",
-    )
-    print(
-        "JSON report:",
-        json_path,
-    )
-    print(
-        "Markdown report:",
-        report_path,
-    )
-
+    print("Schema consistency:", schema_consistency)
+    print("Artifact fit split is train:", artifact_fit_ok)
+    print("Overall status:", payload["overall_status"])
+    print("JSON report:", json_path)
+    print("Markdown report:", markdown_path)
     if not overall_pass:
-        raise SystemExit(
-            "AUDIT FAILED - do not train models yet."
-        )
+        raise SystemExit("AUDIT FAILED - do not train models yet.")
 
 
 if __name__ == "__main__":

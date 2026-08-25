@@ -1,22 +1,89 @@
 {
-  "overall_status": "INVALIDATED",
-  "reason": "Previous PASS used rolling daily samples and does not match the fixed 20-day/6-day/2-day split.",
-  "required_action": "Regenerate all data/modeling outputs and rerun scripts/audit_stage3_model_ready.py.",
-  "splits": {
+  "overall_status": "PASS",
+  "prediction_target": "next-calendar-day user-item purchase",
+  "artifact_fit_split_is_train": true,
+  "schema_consistency": true,
+  "tracking_columns": [
+    "user_id",
+    "item_id",
+    "category_id",
+    "prediction_date"
+  ],
+  "feature_count": 79,
+  "label_windows": {
     "train": {
-      "feature_start": "2025-11-18",
-      "feature_end": "2025-12-07",
-      "label_date": "2025-12-08"
+      "rows_checked": 2944576,
+      "invalid_label_window_rows": 0,
+      "status": "PASS"
     },
     "valid": {
-      "feature_start": "2025-12-09",
-      "feature_end": "2025-12-14",
-      "label_date": "2025-12-15"
+      "rows_checked": 1110131,
+      "invalid_label_window_rows": 0,
+      "status": "PASS"
     },
     "test": {
-      "feature_start": "2025-12-16",
-      "feature_end": "2025-12-17",
-      "label_date": "2025-12-18"
+      "rows_checked": 329938,
+      "invalid_label_window_rows": 0,
+      "status": "PASS"
     }
-  }
+  },
+  "splits": [
+    {
+      "split": "train",
+      "path": "D:\\阿里巴巴实习2\\taobao-user-behavior-prediction\\data\\modeling\\train\\train_model_ready.parquet",
+      "rows": 2944576,
+      "columns": 84,
+      "model_features": 79,
+      "positive": 895,
+      "negative": 2943681,
+      "positive_rate": 0.0003039486839531396,
+      "schema_ok": true,
+      "forbidden_features": [],
+      "duplicate_primary_key_count": 0,
+      "key_order_ok": true,
+      "feature_null_count": 0,
+      "feature_nan_count": 0,
+      "feature_inf_count": 0,
+      "label_ok": true,
+      "status": "PASS"
+    },
+    {
+      "split": "valid",
+      "path": "D:\\阿里巴巴实习2\\taobao-user-behavior-prediction\\data\\modeling\\valid\\valid_model_ready.parquet",
+      "rows": 1110131,
+      "columns": 84,
+      "model_features": 79,
+      "positive": 886,
+      "negative": 1109245,
+      "positive_rate": 0.0007981040075450555,
+      "schema_ok": true,
+      "forbidden_features": [],
+      "duplicate_primary_key_count": 0,
+      "key_order_ok": true,
+      "feature_null_count": 0,
+      "feature_nan_count": 0,
+      "feature_inf_count": 0,
+      "label_ok": true,
+      "status": "PASS"
+    },
+    {
+      "split": "test",
+      "path": "D:\\阿里巴巴实习2\\taobao-user-behavior-prediction\\data\\modeling\\test\\test_model_ready.parquet",
+      "rows": 329938,
+      "columns": 84,
+      "model_features": 79,
+      "positive": 616,
+      "negative": 329322,
+      "positive_rate": 0.0018670174396401749,
+      "schema_ok": true,
+      "forbidden_features": [],
+      "duplicate_primary_key_count": 0,
+      "key_order_ok": true,
+      "feature_null_count": 0,
+      "feature_nan_count": 0,
+      "feature_inf_count": 0,
+      "label_ok": true,
+      "status": "PASS"
+    }
+  ]
 }
