@@ -52,7 +52,7 @@ def main() -> None:
         output_dir = (
             PROJECT_ROOT
             / "data"
-            / "modeling"
+            / "splits"
             / split_name
             / "snapshots"
             / date_string

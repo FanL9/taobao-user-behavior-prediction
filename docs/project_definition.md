@@ -364,6 +364,7 @@ ID 是标识符，不对 `user_id`、`item_id`、`item_category/category_id` 使
 | 文档与报告 | 正式口径放 `docs/`，结果报告放 `reports/`，文件名使用英文 snake_case |
 | 过程小表 | `data/interim/` |
 | 特征大表 | `data/features/` |
+| 阶段三标签、特征快照和切分数据 | `data/splits/` |
 | 模型 | `models/` |
 | 图表和指标 | `outputs/figures/` 和 `outputs/metrics/` |
 | 运行方式 | 正式处理必须由 `scripts/` 中的入口执行，不以 Notebook 手工单次运行作为唯一交付 |

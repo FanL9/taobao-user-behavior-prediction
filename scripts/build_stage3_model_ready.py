@@ -18,7 +18,7 @@ from src.features.stage3_preprocessing import Stage3Preprocessor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ROOT = PROJECT_ROOT / "data" / "modeling"
+ROOT = PROJECT_ROOT / "data" / "splits"
 CONFIG_PATH = PROJECT_ROOT / "configs" / "stage3_feature_config.json"
 FEATURE_LIST_PATH = PROJECT_ROOT / "configs" / "stage3_model_feature_list.txt"
 ARTIFACT_PATH = (

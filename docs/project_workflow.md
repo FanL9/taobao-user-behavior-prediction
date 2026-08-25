@@ -146,7 +146,7 @@ python scr/build_dashboard_data.py
 - 使用 `2025-12-08`、`2025-12-15`、`2025-12-18` 单日购买行为生成标签。
 - 分别重算用户、活跃度、时间、序列、商品、类目、用户—商品和商品转化链路特征。
 - 统一入口 → `scripts/build_stage3_samples_and_labels.py`。
-- 生成三个 87 列建模样本 → `data/modeling/<split>/<split>_modeling.parquet`。
-- 生成合并标签与汇总 → `data/modeling/purchase_labels.parquet` 和 `data/modeling/purchase_label_summary.csv`。
+- 生成三个 87 列建模样本 → `data/splits/<split>/<split>_modeling.parquet`。
+- 生成合并标签与汇总 → `data/splits/purchase_labels.parquet` 和 `data/splits/purchase_label_summary.csv`。
 - 通过同一必跑入口的 `--audit-only` 参数检查主键、标签、特征组、缺失值、全局转化表误拼接和未来时间 → `python scripts/build_stage3_samples_and_labels.py --audit-only`。
 - 审计结果为 `PASS` → `reports/stage3_samples_and_labels_audit.md`。

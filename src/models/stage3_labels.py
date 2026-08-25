@@ -6,7 +6,7 @@ import pandas as pd
 
 
 INPUT_PATH = Path("data/processed/user_behavior_clean.parquet")
-OUTPUT_DIR = Path("data/modeling")
+OUTPUT_DIR = Path("data/splits")
 
 SPLIT_WINDOWS = {
     "train": {

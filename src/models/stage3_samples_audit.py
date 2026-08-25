@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.models.stage3_labels import SPLIT_WINDOWS
 
 
-ROOT = Path("data/modeling")
+ROOT = Path("data/splits")
 JSON_OUTPUT = Path("reports/stage3_samples_and_labels_audit.json")
 MARKDOWN_OUTPUT = Path("reports/stage3_samples_and_labels_audit.md")
 

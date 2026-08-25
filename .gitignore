@@ -17,8 +17,8 @@ data/interim/*.csv
 data/interim/*.parquet
 data/processed/*.csv
 data/processed/*.parquet
-data/splits/*.csv
-data/splits/*.parquet
+data/splits/*
+!data/splits/.gitkeep
 data/predictions/*.csv
 data/predictions/*.parquet
 
@@ -47,7 +47,4 @@ Thumbs.db
 # Keep directory placeholders
 !.gitkeep
 
-data/modeling/
-
 data/features/dashboard/
-data/splits/

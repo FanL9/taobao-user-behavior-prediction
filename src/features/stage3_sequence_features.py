@@ -257,7 +257,7 @@ def build_one(split_name, observation_start, observation_end, label_date):
     )
 
     output = (
-        Path("data/modeling")
+        Path("data/splits")
         / split_name
         / "snapshots"
         / date_string

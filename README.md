@@ -11,6 +11,7 @@ data/raw/user_behavior_processed.csv
     → data/features/user_sequence_features.parquet
     → data/features/item_conversion_features.parquet
     → data/features/user_item_feature_table.parquet
+    → data/splits/<split>/<split>_modeling.parquet
 ```
 
 阶段二的权威输入是：

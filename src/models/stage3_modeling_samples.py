@@ -10,7 +10,7 @@ from src.features.conversion_features import (
 )
 
 
-ROOT: Path = Path("data/modeling")
+ROOT: Path = Path("data/splits")
 
 SPLIT_DATE_RANGES = {
     "train": (

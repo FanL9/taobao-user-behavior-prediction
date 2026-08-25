@@ -38,11 +38,11 @@ python scripts/build_stage3_samples_and_labels.py
 正式输出：
 
 ```text
-data/modeling/train_labels.parquet
-data/modeling/valid_labels.parquet
-data/modeling/test_labels.parquet
-data/modeling/purchase_labels.parquet
-data/modeling/purchase_label_summary.csv
+data/splits/train_labels.parquet
+data/splits/valid_labels.parquet
+data/splits/test_labels.parquet
+data/splits/purchase_labels.parquet
+data/splits/purchase_label_summary.csv
 ```
 
 ### 3.1 标签日首次出现的购买对
@@ -75,9 +75,9 @@ data/modeling/purchase_label_summary.csv
 正式输出：
 
 ```text
-data/modeling/train/train_modeling.parquet
-data/modeling/valid/valid_modeling.parquet
-data/modeling/test/test_modeling.parquet
+data/splits/train/train_modeling.parquet
+data/splits/valid/valid_modeling.parquet
+data/splits/test/test_modeling.parquet
 ```
 
 ## 5. 未来信息与完整性审计

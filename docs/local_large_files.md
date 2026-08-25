@@ -106,22 +106,22 @@
 
 ## 5. 阶段三本地建模文件
 
-阶段三大规模样本、快照特征、标签和最终入模数据均保存在 `data/modeling/` 并由 `.gitignore` 排除。
+阶段三大规模样本、快照特征、标签和最终入模数据均保存在 `data/splits/` 并由 `.gitignore` 排除。
 
 | 本地输出 | 说明 |
 | --- | --- |
-| `data/modeling/train_labels.parquet` | 训练集标签，标签日 `2025-12-08` |
-| `data/modeling/valid_labels.parquet` | 验证集标签，标签日 `2025-12-15` |
-| `data/modeling/test_labels.parquet` | 测试集标签，标签日 `2025-12-18` |
-| `data/modeling/purchase_labels.parquet` | 训练、验证、测试合并标签表，粒度为 `user_id + item_id + prediction_date` |
-| `data/modeling/purchase_label_summary.csv` | 三个数据集的特征日范围、标签日、正负样本数和正样本率 |
-| `data/modeling/<split>/snapshots/<label_date>/features/*.parquet` | 各数据集按其特征基准日范围重算的用户、商品、类目、时间、序列和用户—商品快照特征 |
-| `data/modeling/train/train_modeling.parquet` | 训练集建模样本 |
-| `data/modeling/valid/valid_modeling.parquet` | 验证集建模样本 |
-| `data/modeling/test/test_modeling.parquet` | 测试集建模样本 |
-| `data/modeling/train/train_model_ready.parquet` | 训练集最终入模数据 |
-| `data/modeling/valid/valid_model_ready.parquet` | 验证集最终入模数据 |
-| `data/modeling/test/test_model_ready.parquet` | 测试集最终入模数据 |
+| `data/splits/train_labels.parquet` | 训练集标签，标签日 `2025-12-08` |
+| `data/splits/valid_labels.parquet` | 验证集标签，标签日 `2025-12-15` |
+| `data/splits/test_labels.parquet` | 测试集标签，标签日 `2025-12-18` |
+| `data/splits/purchase_labels.parquet` | 训练、验证、测试合并标签表，粒度为 `user_id + item_id + prediction_date` |
+| `data/splits/purchase_label_summary.csv` | 三个数据集的特征日范围、标签日、正负样本数和正样本率 |
+| `data/splits/<split>/snapshots/<label_date>/features/*.parquet` | 各数据集按其特征基准日范围重算的用户、商品、类目、时间、序列和用户—商品快照特征 |
+| `data/splits/train/train_modeling.parquet` | 训练集建模样本 |
+| `data/splits/valid/valid_modeling.parquet` | 验证集建模样本 |
+| `data/splits/test/test_modeling.parquet` | 测试集建模样本 |
+| `data/splits/train/train_model_ready.parquet` | 训练集最终入模数据 |
+| `data/splits/valid/valid_model_ready.parquet` | 验证集最终入模数据 |
+| `data/splits/test/test_model_ready.parquet` | 测试集最终入模数据 |
 
 阶段三的时间切分、标签窗口和时间泄露规则以 `docs/project_definition.md` 第 15 节为唯一权威口径。
 
