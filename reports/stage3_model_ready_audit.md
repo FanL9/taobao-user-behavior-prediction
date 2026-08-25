@@ -1,129 +1,15 @@
-# Stage 3 Model-Ready Data Audit
+# 阶段三最终入模数据审计
 
-Overall status: **PASS**
+**当前状态：INVALIDATED（已失效）**
 
-- Model feature count: 104
-- Train/valid/test schema consistent: True
-- Prediction target: historically interacted user-item pair purchases the item on the next calendar day
-- Raw identifier and future-window metadata are excluded from model features.
+原 `PASS` 结果基于旧版“日期范围内逐日滚动生成样本”口径，不符合当前固定切分，因此不得继续引用旧样本量、正样本数和审计结论。
 
-| Split | Rows | Positive | Negative | Positive Rate | Duplicate Keys | Null/NaN/Inf | Status |
-|---|---:|---:|---:|---:|---:|---:|---|
-| train | 30,790,020 | 16,750 | 30,773,270 | 0.054401% | 0 | 0 | PASS |
-| valid | 25,172,885 | 12,444 | 25,160,441 | 0.049434% | 0 | 0 | PASS |
-| test | 13,207,000 | 3,128 | 13,203,872 | 0.023684% | 0 | 0 | PASS |
+当前权威切分为：
 
-## Leakage controls
+| 数据集 | 特征 / 预测基准日 | 标签窗口 |
+| --- | --- | --- |
+| 训练集 | `2025-11-18`—`2025-12-07` | `2025-12-08` |
+| 验证集 | `2025-12-09`—`2025-12-14` | `2025-12-15` |
+| 测试集 | `2025-12-16`—`2025-12-17` | `2025-12-18` |
 
-- Features are calculated only from behavior at or before each split cutoff.
-- Next-day label-window timestamps are not model features.
-- `user_id`, `item_id`, and `prediction_date` are retained only as sample keys.
-- Raw `category_id` is excluded from the traditional-model feature matrix.
-- Raw datetime fields are excluded; engineered historical time features remain.
-
-## Final feature list
-
-- `ui_pv_count`
-- `ui_fav_count`
-- `ui_cart_count`
-- `ui_buy_count`
-- `ui_has_bought`
-- `user_total_count`
-- `user_pv_count`
-- `user_fav_count`
-- `user_cart_count`
-- `user_buy_count`
-- `user_unique_item_count`
-- `user_unique_category_count`
-- `user_active_day_count`
-- `user_avg_daily_behavior_count`
-- `user_behavior_span_hours`
-- `user_recency_hours`
-- `user_fav_to_pv_rate`
-- `user_cart_to_pv_rate`
-- `user_buy_to_pv_rate`
-- `user_is_buyer`
-- `user_is_repeat_buyer`
-- `sequence_avg_behavior_gap_hours`
-- `sequence_has_pv_cart`
-- `sequence_has_pv_fav`
-- `sequence_has_pv_buy`
-- `sequence_has_pv_cart_buy`
-- `item_total_count`
-- `item_pv_count`
-- `item_fav_count`
-- `item_cart_count`
-- `item_buy_count`
-- `item_unique_user_count`
-- `item_unique_buyer_count`
-- `item_active_day_count`
-- `item_fav_to_pv_rate`
-- `item_cart_to_pv_rate`
-- `item_buy_to_pv_rate`
-- `category_total_count`
-- `category_pv_count`
-- `category_fav_count`
-- `category_cart_count`
-- `category_buy_count`
-- `category_unique_user_count`
-- `category_unique_item_count`
-- `category_unique_buyer_count`
-- `category_fav_to_pv_rate`
-- `category_cart_to_pv_rate`
-- `category_buy_to_pv_rate`
-- `is_weekend`
-- `time_is_peak_hour`
-- `time_total_count`
-- `time_pv_count`
-- `time_fav_count`
-- `time_cart_count`
-- `time_buy_count`
-- `time_unique_user_count`
-- `time_unique_item_count`
-- `time_buy_to_pv_rate`
-- `conversion_pv_count`
-- `conversion_fav_count`
-- `conversion_cart_count`
-- `conversion_buy_count`
-- `conversion_pv_to_fav_rate`
-- `conversion_pv_to_cart_rate`
-- `conversion_pv_to_buy_rate`
-- `conversion_fav_to_buy_rate`
-- `conversion_cart_to_buy_rate`
-- `conversion_has_full_funnel`
-- `user_activity_level__low`
-- `user_activity_level__high`
-- `item_popularity_level__low`
-- `item_popularity_level__medium`
-- `item_popularity_level__high`
-- `category_popularity_level__long_tail`
-- `category_popularity_level__medium`
-- `category_popularity_level__popular`
-- `time_period__morning`
-- `time_period__afternoon`
-- `time_period__evening`
-- `time_period__night`
-- `weekday__0`
-- `weekday__1`
-- `weekday__2`
-- `weekday__3`
-- `weekday__4`
-- `weekday__5`
-- `weekday__6`
-- `seq_pos_1`
-- `seq_pos_2`
-- `seq_pos_3`
-- `seq_pos_4`
-- `seq_pos_5`
-- `seq_pos_6`
-- `seq_pos_7`
-- `seq_pos_8`
-- `seq_pos_9`
-- `seq_pos_10`
-- `seq_count_behavior_1`
-- `seq_count_behavior_2`
-- `seq_count_behavior_3`
-- `seq_count_behavior_4`
-- `seq_distinct_behavior_count`
-- `ui_last_interaction_hour_sin`
-- `ui_last_interaction_hour_cos`
+必须按新口径重新生成全部 `data/modeling/` 本地文件，再运行 `python scripts/audit_stage3_model_ready.py` 刷新本报告。

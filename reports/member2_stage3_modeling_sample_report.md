@@ -1,212 +1,125 @@
-# Member 2 Stage 3 Modeling Sample Report
+# Member 2 阶段三建模样本与标签构建报告
 
-## 1. Task Scope
+## 1. 任务范围
 
-Member 2 is responsible for preparing the model-ready user-item samples for Stage 3, including:
+本次完成 Member 2 的两部分交付：
 
-* constructing user-item modeling samples;
-* generating future 7-day purchase labels;
-* splitting train / validation / test datasets by time;
-* rebuilding features based only on information available before each cutoff;
-* preprocessing model features;
-* excluding identifiers, future-window metadata, and leakage-prone raw fields;
-* auditing the final model-ready datasets before handing them to Member 1.
+1. 基于分窗口重算的阶段二特征构建建模样本；
+2. 构建单日购买标签，并检查标签、时间窗口与未来信息。
 
-The final prediction task is:
-
-> Given historical behavior up to the prediction cutoff, predict whether a specific `user_id + item_id` pair will generate a purchase within the following 7 days.
-
-## 2. Sample Granularity and Target
-
-Sample key:
+原根目录临时文件 `temp.py` 已移除，正式统一入口为：
 
 ```text
-user_id + item_id
+python scripts/build_stage3_samples_and_labels.py
 ```
 
-Target column:
+该入口依次生成标签、基础特征快照、序列特征、建模样本和审计报告，不依赖个人桌面路径。
+
+## 2. 时间口径
+
+| 数据集 | 特征 / 预测基准日 | 标签日 | 特征原始行为数 |
+| --- | --- | --- | ---: |
+| train | `2025-11-18`—`2025-12-07` | `2025-12-08` | 7,506,554 |
+| valid | `2025-12-09`—`2025-12-14` | `2025-12-15` | 2,809,856 |
+| test | `2025-12-16`—`2025-12-17` | `2025-12-18` | 779,876 |
+
+每个数据集只生成一个特征快照和一个单日标签窗口，不在特征日范围内逐日滚动生成样本。
+
+## 3. 购买标签
+
+每个数据集内以 `user_id + item_id` 为样本主键，标签表保留 `prediction_date` 追踪标签日。候选用户—商品对在标签日购买该商品记为 `label=1`，否则记为 `label=0`。
+
+| 数据集 | 样本数 | 正样本 | 负样本 | 正样本率 | 错标 / 漏标 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| train | 2,944,576 | 895 | 2,943,681 | 0.030395% | 0 |
+| valid | 1,110,131 | 886 | 1,109,245 | 0.079810% | 0 |
+| test | 329,938 | 616 | 329,322 | 0.186702% | 0 |
+
+正式输出：
 
 ```text
-label
+data/modeling/train_labels.parquet
+data/modeling/valid_labels.parquet
+data/modeling/test_labels.parquet
+data/modeling/purchase_labels.parquet
+data/modeling/purchase_label_summary.csv
 ```
 
-Label definition:
+### 3.1 标签日首次出现的购买对
+
+候选集只包含对应特征基准日范围内出现过的用户—商品对，因此标签日首次出现的购买对不进入当前候选集。
+
+| 数据集 | 标签日全部购买对 | 被排除的新购买对 |
+| --- | ---: | ---: |
+| train | 2,997 | 2,102 |
+| valid | 3,301 | 2,415 |
+| test | 3,151 | 2,535 |
+
+这是候选集适用范围，不是错标。模型结论中必须说明当前模型不覆盖标签日首次出现的用户—商品对。
+
+## 4. 建模样本特征
+
+三个建模样本均为 87 列，已关联下列八类特征：
+
+- 用户—商品交互特征；
+- 用户基础行为特征；
+- 用户活跃度特征；
+- 时间特征；
+- 用户行为序列特征；
+- 商品行为与热度特征；
+- 类目行为与热度特征；
+- `item_id` 粒度的商品转化链路特征。
+
+全局单行 `conversion_features.parquet` / `conversion_scope` 没有拼入建模样本。
+
+正式输出：
 
 ```text
-label = 1
+data/modeling/train/train_modeling.parquet
+data/modeling/valid/valid_modeling.parquet
+data/modeling/test/test_modeling.parquet
 ```
 
-if the user purchases the corresponding item within the future 7-day prediction window.
+## 5. 未来信息与完整性审计
+
+审计入口：
 
 ```text
-label = 0
+python scripts/build_stage3_samples_and_labels.py --audit-only
 ```
 
-otherwise.
+审计结果：`PASS`。
 
-`user_id` and `item_id` remain sample identifiers and are not included in the traditional machine-learning feature matrix.
+| 数据集 | 用户—商品最后交互最大时间 | 用户最后行为最大时间 | 未来时间字段 | 缺失值 |
+| --- | --- | --- | ---: | ---: |
+| train | `2025-12-07 23:00:00` | `2025-12-07 23:00:00` | 0 | 0 |
+| valid | `2025-12-14 23:00:00` | `2025-12-14 23:00:00` | 0 | 0 |
+| test | `2025-12-17 23:00:00` | `2025-12-17 23:00:00` | 0 | 0 |
 
-## 3. Final Model-Ready Files
+同时通过以下检查：
 
-The final model-ready datasets are generated locally and are not uploaded to GitHub.
+- 标签值仅为 0/1；
+- 标签表和建模样本均无主键重复；
+- 建模样本与对应标签表的主键和标签完全一致；
+- 八类要求特征全部存在；
+- 建模样本无缺失值；
+- 未将全局单行转化率拼入宽表。
+
+详细结果：
 
 ```text
-data/modeling/train/train_model_ready.parquet
-data/modeling/valid/valid_model_ready.parquet
-data/modeling/test/test_model_ready.parquet
+reports/stage3_samples_and_labels_audit.json
+reports/stage3_samples_and_labels_audit.md
 ```
 
-Current audited dataset sizes:
-
-| Split |      Rows | Positive Samples | Negative Samples | Positive Rate |
-| ----- | --------: | ---------------: | ---------------: | ------------: |
-| Train | 1,459,489 |            2,924 |        1,456,565 |     0.200344% |
-| Valid | 2,507,302 |            3,243 |        2,504,059 |     0.129342% |
-| Test  | 3,574,665 |            9,315 |        3,565,350 |     0.260584% |
-
-The purchase-prediction task is therefore highly imbalanced. Member 1 should not rely on Accuracy alone when evaluating model quality.
-
-## 4. Model Feature Set
-
-Each model-ready dataset contains:
+## 6. 交付状态
 
 ```text
-107 total columns
-104 model features
+Member 2 第 1 部分：建模样本构建       PASS
+Member 2 第 3 部分：购买预测标签构建   PASS
+时间窗口隔离                          PASS
+未来信息审计                          PASS
+建模样本与标签一致性                PASS
 ```
 
-The remaining columns are sample identifiers and the target.
-
-The final feature set covers the following major groups:
-
-* user-item interaction features;
-* user behavior and activity features;
-* item behavior and popularity features;
-* category behavior and popularity features;
-* conversion-chain features;
-* user behavior sequence features;
-* time-period and weekday features;
-* engineered recency and interaction-time features.
-
-The final model feature list is stored in:
-
-```text
-configs/stage3_model_feature_list.txt
-```
-
-Feature configuration is stored in:
-
-```text
-configs/stage3_feature_config.json
-```
-
-## 5. Leakage Control
-
-The Stage 3 feature pipeline follows the prediction-window isolation rule.
-
-Main controls include:
-
-* features are calculated only from behavior available at or before each split cutoff;
-* the future 7-day label window is used only for label generation;
-* `cutoff_time`, `label_start`, and `label_end` are metadata and are not model features;
-* raw `user_id` and `item_id` remain sample keys rather than traditional model features;
-* raw `category_id` is excluded as an integer identifier while category aggregate features remain;
-* raw datetime fields are excluded after engineered time and recency features are generated;
-* train / validation / test datasets use a consistent model feature schema.
-
-## 6. Final Audit Result
-
-The final audit script is:
-
-```text
-scripts/audit_stage3_model_ready.py
-```
-
-Audit reports:
-
-```text
-reports/stage3_model_ready_audit.json
-reports/stage3_model_ready_audit.md
-```
-
-Current audit result:
-
-```text
-Overall status: PASS
-Schema consistency: True
-Model feature count: 104
-```
-
-For all three splits:
-
-* duplicate sample keys: 0;
-* feature null values: 0;
-* feature NaN values: 0;
-* feature infinite values: 0;
-* constant features: 0;
-* forbidden leakage columns: none;
-* label validation: PASS.
-
-## 7. Handover to Member 1
-
-Member 1 can use the following files directly for baseline model training:
-
-```text
-data/modeling/train/train_model_ready.parquet
-data/modeling/valid/valid_model_ready.parquet
-data/modeling/test/test_model_ready.parquet
-```
-
-Recommended loading logic:
-
-```python
-import pandas as pd
-
-train = pd.read_parquet("data/modeling/train/train_model_ready.parquet")
-valid = pd.read_parquet("data/modeling/valid/valid_model_ready.parquet")
-test = pd.read_parquet("data/modeling/test/test_model_ready.parquet")
-
-feature_cols = [
-    line.strip()
-    for line in open("configs/stage3_model_feature_list.txt", encoding="utf-8")
-    if line.strip()
-]
-
-X_train = train[feature_cols]
-y_train = train["label"]
-
-X_valid = valid[feature_cols]
-y_valid = valid["label"]
-
-X_test = test[feature_cols]
-y_test = test["label"]
-```
-
-Member 1 can then proceed with:
-
-```text
-Logistic Regression
-Random Forest
-XGBoost
-LightGBM
-```
-
-Because the positive class is highly imbalanced, model training should compare class weighting and other imbalance-handling strategies. Validation and test evaluation should focus especially on ROC-AUC, PR-AUC / Average Precision, Precision, Recall and F1 rather than Accuracy alone.
-
-## 8. Stage 3 Member 2 Status
-
-Current Member 2 core Stage 3 modeling-data tasks are considered completed:
-
-```text
-Modeling sample construction        DONE
-Future 7-day label generation       DONE
-Time-based dataset split            DONE
-Feature reconstruction              DONE
-Feature preprocessing               DONE
-Final model feature list            DONE
-Leakage control                     DONE
-Model-ready audit                   PASS
-Member 1 training-data handover     READY
-```
-
-Large model-ready Parquet files remain local and are not uploaded to GitHub.
+本报告不代表 Member 2 第 5 部分“特征预处理 / model-ready”已按新口径完成。旧的 `stage3_model_ready_audit` 仍保持 `INVALIDATED`，需在完成第 5 部分后重新生成。

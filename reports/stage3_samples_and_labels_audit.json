@@ -1,0 +1,164 @@
+{
+  "overall_status": "PASS",
+  "splits": [
+    {
+      "split": "train",
+      "feature_start": "2025-11-18",
+      "feature_end": "2025-12-07",
+      "label_date": "2025-12-08",
+      "rows": 2944576,
+      "positive": 895,
+      "negative": 2943681,
+      "positive_rate": 0.0003039486839531396,
+      "label_values": [
+        0,
+        1
+      ],
+      "duplicate_label_keys": 0,
+      "duplicate_modeling_keys": 0,
+      "keys_and_labels_match": true,
+      "feature_groups": {
+        "user_item": true,
+        "user_behavior": true,
+        "user_activity": true,
+        "time": true,
+        "sequence": true,
+        "item": true,
+        "category": true,
+        "item_conversion": true
+      },
+      "global_conversion_joined": false,
+      "modeling_columns": 87,
+      "modeling_null_count": 0,
+      "modeling_null_count_complete": true,
+      "raw_time_maxima": {
+        "ui_last_interaction_time": "2025-12-07 23:00:00",
+        "user_first_behavior_time": "2025-12-07 23:00:00",
+        "user_last_behavior_time": "2025-12-07 23:00:00"
+      },
+      "future_raw_time_columns": [],
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "split": "valid",
+      "feature_start": "2025-12-09",
+      "feature_end": "2025-12-14",
+      "label_date": "2025-12-15",
+      "rows": 1110131,
+      "positive": 886,
+      "negative": 1109245,
+      "positive_rate": 0.0007981040075450555,
+      "label_values": [
+        0,
+        1
+      ],
+      "duplicate_label_keys": 0,
+      "duplicate_modeling_keys": 0,
+      "keys_and_labels_match": true,
+      "feature_groups": {
+        "user_item": true,
+        "user_behavior": true,
+        "user_activity": true,
+        "time": true,
+        "sequence": true,
+        "item": true,
+        "category": true,
+        "item_conversion": true
+      },
+      "global_conversion_joined": false,
+      "modeling_columns": 87,
+      "modeling_null_count": 0,
+      "modeling_null_count_complete": true,
+      "raw_time_maxima": {
+        "ui_last_interaction_time": "2025-12-14 23:00:00",
+        "user_first_behavior_time": "2025-12-14 23:00:00",
+        "user_last_behavior_time": "2025-12-14 23:00:00"
+      },
+      "future_raw_time_columns": [],
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "split": "test",
+      "feature_start": "2025-12-16",
+      "feature_end": "2025-12-17",
+      "label_date": "2025-12-18",
+      "rows": 329938,
+      "positive": 616,
+      "negative": 329322,
+      "positive_rate": 0.0018670174396401749,
+      "label_values": [
+        0,
+        1
+      ],
+      "duplicate_label_keys": 0,
+      "duplicate_modeling_keys": 0,
+      "keys_and_labels_match": true,
+      "feature_groups": {
+        "user_item": true,
+        "user_behavior": true,
+        "user_activity": true,
+        "time": true,
+        "sequence": true,
+        "item": true,
+        "category": true,
+        "item_conversion": true
+      },
+      "global_conversion_joined": false,
+      "modeling_columns": 87,
+      "modeling_null_count": 0,
+      "modeling_null_count_complete": true,
+      "raw_time_maxima": {
+        "ui_last_interaction_time": "2025-12-17 23:00:00",
+        "user_first_behavior_time": "2025-12-17 23:00:00",
+        "user_last_behavior_time": "2025-12-17 23:00:00"
+      },
+      "future_raw_time_columns": [],
+      "status": "PASS",
+      "failures": []
+    }
+  ],
+  "label_summary": [
+    {
+      "dataset": "train",
+      "feature_start": "2025-11-18",
+      "feature_end": "2025-12-07",
+      "label_start": "2025-12-08",
+      "label_end": "2025-12-08",
+      "total_samples": 2944576,
+      "positive_samples": 895,
+      "negative_samples": 2943681,
+      "positive_rate": 0.0003039486839531,
+      "label_purchase_pairs": 2997,
+      "excluded_new_purchase_pairs": 2102
+    },
+    {
+      "dataset": "valid",
+      "feature_start": "2025-12-09",
+      "feature_end": "2025-12-14",
+      "label_start": "2025-12-15",
+      "label_end": "2025-12-15",
+      "total_samples": 1110131,
+      "positive_samples": 886,
+      "negative_samples": 1109245,
+      "positive_rate": 0.000798104007545,
+      "label_purchase_pairs": 3301,
+      "excluded_new_purchase_pairs": 2415
+    },
+    {
+      "dataset": "test",
+      "feature_start": "2025-12-16",
+      "feature_end": "2025-12-17",
+      "label_start": "2025-12-18",
+      "label_end": "2025-12-18",
+      "total_samples": 329938,
+      "positive_samples": 616,
+      "negative_samples": 329322,
+      "positive_rate": 0.0018670174396401,
+      "label_purchase_pairs": 3151,
+      "excluded_new_purchase_pairs": 2535
+    }
+  ],
+  "failures": []
+}

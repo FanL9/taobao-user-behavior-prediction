@@ -15,6 +15,8 @@
 | 2026-08-20 | Member 1 | v1.6 | 新增用户-商品交互特征表 |
 | 2026-08-23 | Member 1 | v1.7 | 补充 Member 2/3 阶段二交付、校验结果和未完成项 |
 | 2026-08-23 | Member 1 | v1.8 | 完成高峰、热度、转化特征、Member 2/3 校验和 82 列初版宽表 |
+| 2026-08-25 | Member 1 | v1.9 | 补全阶段一、二表格交付清单，明确阶段二看板数据待生成，统一阶段三固定时间切分 |
+| 2026-08-25 | Member 1 | v1.10 | 完成阶段三 Member 2 第 1、3 部分固定窗口样本、标签、特征快照和未来信息审计 |
 
 ## 阶段一：数据接入、基础治理与初步 EDA
 
@@ -125,7 +127,7 @@ data/processed/user_behavior_clean.parquet
     → python scripts/build_stage2_feature_table.py
 ```
 
-看板不在本次阶段二非看板交付的完成判定范围内。
+阶段二分工要求的四张看板 Parquet 表由 `scr/build_dashboard_data.py` 生成；当前 `data/features/dashboard/` 中尚未生成这四张表，待补齐后再将看板数据交付标记为完成。
 
 ### 6. 辅助产物生成
 
@@ -137,3 +139,14 @@ python scr/build_member3_stage2_report.py
 python scr/build_stage2_feature_table_report.py
 python scr/build_dashboard_data.py
 ```
+
+## 阶段三：Member 2 建模样本与标签
+
+- 根据固定 20 天 / 6 天 / 2 天特征窗口构建候选用户—商品对。
+- 使用 `2025-12-08`、`2025-12-15`、`2025-12-18` 单日购买行为生成标签。
+- 分别重算用户、活跃度、时间、序列、商品、类目、用户—商品和商品转化链路特征。
+- 统一入口 → `scripts/build_stage3_samples_and_labels.py`。
+- 生成三个 87 列建模样本 → `data/modeling/<split>/<split>_modeling.parquet`。
+- 生成合并标签与汇总 → `data/modeling/purchase_labels.parquet` 和 `data/modeling/purchase_label_summary.csv`。
+- 通过同一必跑入口的 `--audit-only` 参数检查主键、标签、特征组、缺失值、全局转化表误拼接和未来时间 → `python scripts/build_stage3_samples_and_labels.py --audit-only`。
+- 审计结果为 `PASS` → `reports/stage3_samples_and_labels_audit.md`。

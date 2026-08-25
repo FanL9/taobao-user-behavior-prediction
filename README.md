@@ -44,7 +44,7 @@ python scripts/build_stage2_feature_table.py
 
 ### 可视化看板
 
-看板不属于当前阶段二完成范围；需要本地预览现有页面时运行：
+阶段二分工包含 EDA 看板初版和特征看板数据。生成本地看板数据并预览页面时运行：
 
 ```bash
 python scr/build_dashboard_data.py
@@ -85,3 +85,6 @@ Member 2/3 的非看板特征、转化表和初版宽表已生成并通过质量
 - Member 2 阶段二报告：`reports/member2_stage2_feature_report.md`
 - Member 3 阶段二报告：`reports/member3_stage2_feature_report.md`
 - 初版特征宽表报告：`reports/stage2_feature_table_report.md`
+- 阶段三 Member 2 样本与标签生成：`python scripts/build_stage3_samples_and_labels.py`
+- 阶段三样本与标签报告：`reports/member2_stage3_modeling_sample_report.md`
+- 阶段三样本与标签审计：`reports/stage3_samples_and_labels_audit.md`

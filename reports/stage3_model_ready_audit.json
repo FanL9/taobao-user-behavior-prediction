@@ -1,64 +1,22 @@
 {
-  "overall_status": "PASS",
-  "schema_consistency": true,
-  "feature_count": 104,
-  "splits": [
-    {
-      "split": "train",
-      "path": "data\\modeling\\train\\train_model_ready.parquet",
-      "rows": 30790020,
-      "columns": 108,
-      "model_features": 104,
-      "positive": 16750,
-      "negative": 30773270,
-      "positive_rate": 0.0005440074413722368,
-      "schema_ok": true,
-      "forbidden_columns_present": [],
-      "duplicate_primary_key_count": 0,
-      "feature_null_count": 0,
-      "feature_nan_count": 0,
-      "feature_inf_count": 0,
-      "constant_features": [],
-      "label_ok": true,
-      "status": "PASS"
+  "overall_status": "INVALIDATED",
+  "reason": "Previous PASS used rolling daily samples and does not match the fixed 20-day/6-day/2-day split.",
+  "required_action": "Regenerate all data/modeling outputs and rerun scripts/audit_stage3_model_ready.py.",
+  "splits": {
+    "train": {
+      "feature_start": "2025-11-18",
+      "feature_end": "2025-12-07",
+      "label_date": "2025-12-08"
     },
-    {
-      "split": "valid",
-      "path": "data\\modeling\\valid\\valid_model_ready.parquet",
-      "rows": 25172885,
-      "columns": 108,
-      "model_features": 104,
-      "positive": 12444,
-      "negative": 25160441,
-      "positive_rate": 0.0004943414312662215,
-      "schema_ok": true,
-      "forbidden_columns_present": [],
-      "duplicate_primary_key_count": 0,
-      "feature_null_count": 0,
-      "feature_nan_count": 0,
-      "feature_inf_count": 0,
-      "constant_features": [],
-      "label_ok": true,
-      "status": "PASS"
+    "valid": {
+      "feature_start": "2025-12-09",
+      "feature_end": "2025-12-14",
+      "label_date": "2025-12-15"
     },
-    {
-      "split": "test",
-      "path": "data\\modeling\\test\\test_model_ready.parquet",
-      "rows": 13207000,
-      "columns": 108,
-      "model_features": 104,
-      "positive": 3128,
-      "negative": 13203872,
-      "positive_rate": 0.00023684409782690998,
-      "schema_ok": true,
-      "forbidden_columns_present": [],
-      "duplicate_primary_key_count": 0,
-      "feature_null_count": 0,
-      "feature_nan_count": 0,
-      "feature_inf_count": 0,
-      "constant_features": [],
-      "label_ok": true,
-      "status": "PASS"
+    "test": {
+      "feature_start": "2025-12-16",
+      "feature_end": "2025-12-17",
+      "label_date": "2025-12-18"
     }
-  ]
+  }
 }

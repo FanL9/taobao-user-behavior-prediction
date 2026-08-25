@@ -5,41 +5,41 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 
-INPUT_PATH = Path(
+INPUT_PATH: Path = Path(
     "data/processed/user_behavior_clean.parquet"
 )
 
-OBSERVATION_START = pd.Timestamp(
-    "2025-11-18 00:00:00"
-)
-
-SPLIT_DATE_RANGES = {
+SPLIT_WINDOWS = {
     "train": (
         pd.Timestamp("2025-11-18"),
         pd.Timestamp("2025-12-07"),
+        pd.Timestamp("2025-12-08"),
     ),
     "valid": (
-        pd.Timestamp("2025-12-08"),
+        pd.Timestamp("2025-12-09"),
         pd.Timestamp("2025-12-14"),
+        pd.Timestamp("2025-12-15"),
     ),
     "test": (
-        pd.Timestamp("2025-12-15"),
+        pd.Timestamp("2025-12-16"),
         pd.Timestamp("2025-12-17"),
+        pd.Timestamp("2025-12-18"),
     ),
 }
 
 
-def build_one(split_name, prediction_date):
+def build_one(split_name, observation_start, observation_end, label_date):
 
     cutoff = (
-        prediction_date.normalize()
+        observation_end.normalize()
         + pd.Timedelta(days=1)
         - pd.Timedelta(seconds=1)
     )
 
     print("=" * 80)
     print("split           :", split_name)
-    print("prediction_date :", prediction_date.date())
+    print("label_date      :", label_date.date())
+    print("observation_from:", observation_start.date())
     print("cutoff          :", cutoff)
 
     df = pd.read_parquet(
@@ -51,7 +51,7 @@ def build_one(split_name, prediction_date):
             "time",
         ],
         filters=[
-            ("time", ">=", OBSERVATION_START),
+            ("time", ">=", observation_start),
             ("time", "<=", cutoff),
         ],
     )
@@ -252,7 +252,7 @@ def build_one(split_name, prediction_date):
         preserve_index=False,
     )
 
-    date_string = prediction_date.strftime(
+    date_string = label_date.strftime(
         "%Y-%m-%d"
     )
 
@@ -283,19 +283,16 @@ def build_one(split_name, prediction_date):
 def main():
 
     for split_name, (
-        start_date,
-        end_date,
-    ) in SPLIT_DATE_RANGES.items():
-
-        for prediction_date in pd.date_range(
-            start=start_date,
-            end=end_date,
-            freq="D",
-        ):
-            build_one(
-                split_name,
-                prediction_date,
-            )
+        observation_start,
+        observation_end,
+        label_date,
+    ) in SPLIT_WINDOWS.items():
+        build_one(
+            split_name,
+            observation_start,
+            observation_end,
+            label_date,
+        )
 
 
 if __name__ == "__main__":

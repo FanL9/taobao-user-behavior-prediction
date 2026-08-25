@@ -10,20 +10,20 @@ from src.features.conversion_features import (
 )
 
 
-ROOT = Path("data/modeling")
+ROOT: Path = Path("data/modeling")
 
 SPLIT_DATE_RANGES = {
     "train": (
-        pd.Timestamp("2025-11-18"),
-        pd.Timestamp("2025-12-07"),
+        pd.Timestamp("2025-12-08"),
+        pd.Timestamp("2025-12-08"),
     ),
     "valid": (
-        pd.Timestamp("2025-12-08"),
-        pd.Timestamp("2025-12-14"),
+        pd.Timestamp("2025-12-15"),
+        pd.Timestamp("2025-12-15"),
     ),
     "test": (
-        pd.Timestamp("2025-12-15"),
-        pd.Timestamp("2025-12-17"),
+        pd.Timestamp("2025-12-18"),
+        pd.Timestamp("2025-12-18"),
     ),
 }
 

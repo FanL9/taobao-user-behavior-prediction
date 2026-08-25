@@ -52,7 +52,14 @@ python scripts/build_stage2_feature_table.py
 The output is `user_item_feature_table.parquet`. It combines user, sequence,
 item, category, time, user-item interaction, and item-conversion features.
 
-Dashboard datasets are outside the current stage-two completion scope.
+Dashboard datasets are part of the stage-two assignment. Generate the four
+local-only dashboard Parquet tables with:
+
+```bash
+python scr/build_dashboard_data.py
+```
+
+The expected files are documented in `docs/local_large_files.md`.
 
 Do not manually edit generated Parquet files. See
 `docs/local_large_files.md` for all local-only data files.
